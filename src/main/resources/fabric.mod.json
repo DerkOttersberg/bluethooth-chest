@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "derk_easy_inventory_crafter",
+  "version": "${version}",
+
+  "name": "Bluethooth Chest",
+  "description": "Craft straight from nearby chests with a clean nearby-items panel, recipe book support, and chest highlighting.",
+  "icon": "icon.png",
+  "authors": [
+    "Derk"
+  ],
+  "contact": {
+    "sources": ""
+  },
+
+  "license": "CC0-1.0",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.derk.easyinventorycrafter.EasyInventoryCrafterMod"
+    ],
+    "client": [
+      "com.derk.easyinventorycrafter.EasyInventoryCrafterClient"
+    ]
+  },
+  "mixins": [
+    "easyinventorycrafter.mixins.json"
+  ],
+
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "fabric": "*",
+    "minecraft": ">=1.21.11"
+  },
+  "suggests": {}
+}

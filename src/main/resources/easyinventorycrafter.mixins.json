@@ -1,0 +1,22 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "refmap": "derk_easy_inventory_crafter.refmap.json",
+  "package": "com.derk.easyinventorycrafter.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AbstractCraftingScreenHandlerMixin",
+    "CraftingResultSlotMixin",
+    "CraftingScreenHandlerMixin",
+    "HandledScreenMixin",
+    "InputSlotFillerMixin"
+  ],
+  "client": [
+    "CraftingScreenMixin",
+    "RecipeBookScreenMixin",
+    "RecipeBookWidgetMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
