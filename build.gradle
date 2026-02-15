@@ -1,6 +1,7 @@
 plugins {
 	id 'fabric-loom' version '1.6-SNAPSHOT'
 	id 'maven-publish'
+	id 'com.diffplug.spotless' version '6.25.0'
 }
 
 def targetJavaVersion = 17
@@ -9,7 +10,18 @@ version = project.mod_version
 group = project.maven_group
 
 base {
-	archivesName = project.archives_base_name
+	archivesName = "${project.archives_base_name}-fabric-${project.minecraft_version}"
+}
+
+spotless {
+	java {
+		target 'src/*/java/**/*.java'
+		googleJavaFormat('1.17.0').aosp()
+		removeUnusedImports()
+		trimTrailingWhitespace()
+		endWithNewline()
+		importOrder('java', 'javax', 'net.minecraft', 'net.fabricmc', 'com.derk', '')
+	}
 }
 
 repositories {

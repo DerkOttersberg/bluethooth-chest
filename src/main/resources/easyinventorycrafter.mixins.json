@@ -8,12 +8,10 @@
     "AbstractCraftingScreenHandlerMixin",
     "CraftingResultSlotMixin",
     "CraftingScreenHandlerMixin",
-    "HandledScreenMixin",
     "InputSlotFillerMixin"
   ],
   "client": [
     "CraftingScreenMixin",
-    "RecipeBookScreenMixin",
     "RecipeBookWidgetMixin"
   ],
   "injectors": {

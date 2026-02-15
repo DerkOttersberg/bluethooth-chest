@@ -3,11 +3,12 @@ package com.derk.easyinventorycrafter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.LinkedHashSet;
+
 import net.minecraft.block.entity.HopperBlockEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.inventory.Inventory;
@@ -17,127 +18,172 @@ import net.minecraft.screen.ScreenHandlerContext;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
+import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
+import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
+import net.fabricmc.fabric.api.transfer.v1.storage.StorageView;
+
 public final class NearbyInventoryScanner {
-	public static final int DEFAULT_RADIUS = 16;
-	private static final int MAX_ENTRIES = 512;
+    public static final int DEFAULT_RADIUS = 16;
+    private static final int MAX_ENTRIES = 512;
 
-	private NearbyInventoryScanner() {
-	}
+    private NearbyInventoryScanner() {}
 
-	public static List<Inventory> findNearbyInventories(World world, BlockPos center, int radius) {
-		Map<Inventory, Boolean> seen = new IdentityHashMap<>();
-		List<Inventory> inventories = new ArrayList<>();
-		BlockPos min = center.add(-radius, -radius, -radius);
-		BlockPos max = center.add(radius, radius, radius);
+    public static List<Storage<ItemVariant>> findNearbyStorages(
+            World world, BlockPos center, int radius) {
+        Set<Object> visitedIdentities =
+                java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        List<Storage<ItemVariant>> storages = new ArrayList<>();
+        BlockPos min = center.add(-radius, -radius, -radius);
+        BlockPos max = center.add(radius, radius, radius);
 
-		for (BlockPos pos : BlockPos.iterate(min, max)) {
-			if (!world.isChunkLoaded(pos)) {
-				continue;
-			}
+        for (BlockPos pos : BlockPos.iterate(min, max)) {
+            if (!world.isChunkLoaded(pos)) {
+                continue;
+            }
 
-			Inventory inventory = HopperBlockEntity.getInventoryAt(world, pos);
-			if (inventory instanceof PlayerInventory) {
-				continue;
-			}
-			if (inventory != null && seen.putIfAbsent(inventory, Boolean.TRUE) == null) {
-				inventories.add(inventory);
-			}
-		}
+            Storage<ItemVariant> storage = getStorageAt(world, pos, visitedIdentities);
+            if (storage != null) {
+                storages.add(storage);
+            }
+        }
 
-		return inventories;
-	}
+        return storages;
+    }
 
-	public static List<NearbyItemEntry> collectItemCounts(World world, BlockPos center, int radius) {
-		List<Inventory> inventories = findNearbyInventories(world, center, radius);
-		Map<Item, Integer> totals = new HashMap<>();
+    private static Storage<ItemVariant> getStorageAt(
+            World world, BlockPos pos, Set<Object> visitedIdentities) {
+        // 1. Try Fabric API Lookup (covers modded storage + vanilla blocks)
+        Storage<ItemVariant> storage = ItemStorage.SIDED.find(world, pos, null);
+        if (storage != null) {
+            // Deduplicate based on Storage identity
+            if (visitedIdentities.add(storage)) {
+                return storage;
+            }
+            return null;
+        }
 
-		for (Inventory inventory : inventories) {
-			for (int i = 0; i < inventory.size(); i++) {
-				ItemStack stack = inventory.getStack(i);
-				if (!stack.isEmpty()) {
-					totals.merge(stack.getItem(), stack.getCount(), Integer::sum);
-				}
-			}
-		}
+        // 2. Fallback to vanilla inventory check (covers entities like Chest Minecarts)
+        Inventory inventory = HopperBlockEntity.getInventoryAt(world, pos);
+        if (inventory != null && !(inventory instanceof PlayerInventory)) {
+            // Deduplicate based on Inventory identity
+            if (visitedIdentities.add(inventory)) {
+                return InventoryStorage.of(inventory, null);
+            }
+        }
 
-		List<NearbyItemEntry> entries = new ArrayList<>();
-		for (Map.Entry<Item, Integer> entry : totals.entrySet()) {
-			Item item = entry.getKey();
-			int count = entry.getValue();
-			entries.add(new NearbyItemEntry(new ItemStack(item), count));
-			if (entries.size() >= MAX_ENTRIES) {
-				break;
-			}
-		}
+        return null;
+    }
 
-		return entries;
-	}
+    public static List<NearbyItemEntry> collectItemCounts(
+            World world, BlockPos center, int radius) {
+        List<Storage<ItemVariant>> storages = findNearbyStorages(world, center, radius);
+        Map<Item, Long> totals = new HashMap<>();
 
-	public static BlockPos findFirstInventoryPosWithItem(World world, BlockPos center, int radius, Item item) {
-		BlockPos min = center.add(-radius, -radius, -radius);
-		BlockPos max = center.add(radius, radius, radius);
-		for (BlockPos pos : BlockPos.iterate(min, max)) {
-			if (!world.isChunkLoaded(pos)) {
-				continue;
-			}
-			Inventory inventory = HopperBlockEntity.getInventoryAt(world, pos);
-			if (inventory == null || inventory instanceof PlayerInventory) {
-				continue;
-			}
-			for (int i = 0; i < inventory.size(); i++) {
-				ItemStack stack = inventory.getStack(i);
-				if (!stack.isEmpty() && stack.getItem() == item) {
-					return pos.toImmutable();
-				}
-			}
-		}
-		return null;
-	}
+        for (Storage<ItemVariant> storage : storages) {
+            for (StorageView<ItemVariant> view : storage) {
+                if (!view.isResourceBlank()) {
+                    totals.merge(view.getResource().getItem(), view.getAmount(), Long::sum);
+                }
+            }
+        }
 
-	public static List<BlockPos> findInventoryPositionsWithItem(World world, BlockPos center, int radius, Item item) {
-		Map<Inventory, Boolean> cache = new IdentityHashMap<>();
-		Set<BlockPos> positions = new LinkedHashSet<>();
-		BlockPos min = center.add(-radius, -radius, -radius);
-		BlockPos max = center.add(radius, radius, radius);
+        List<NearbyItemEntry> entries = new ArrayList<>();
+        for (Map.Entry<Item, Long> entry : totals.entrySet()) {
+            Item item = entry.getKey();
+            int count = (int) Math.min(entry.getValue(), Integer.MAX_VALUE);
+            entries.add(new NearbyItemEntry(new ItemStack(item), count));
+            if (entries.size() >= MAX_ENTRIES) {
+                break;
+            }
+        }
 
-		for (BlockPos pos : BlockPos.iterate(min, max)) {
-			if (!world.isChunkLoaded(pos)) {
-				continue;
-			}
-			Inventory inventory = HopperBlockEntity.getInventoryAt(world, pos);
-			if (inventory instanceof PlayerInventory) {
-				continue;
-			}
-			if (inventory == null) {
-				continue;
-			}
-			boolean hasItem = cache.computeIfAbsent(inventory, inv -> inventoryHasItem(inv, item));
-			if (hasItem) {
-				positions.add(pos.toImmutable());
-			}
-		}
+        return entries;
+    }
 
-		return new ArrayList<>(positions);
-	}
+    public static List<BlockPos> findInventoryPositionsWithItem(
+            World world, BlockPos center, int radius, Item item) {
+        Set<Object> visitedCache = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        // Cache whether a specific storage/inventory contains the item to avoid re-scanning
+        Map<Object, Boolean> hasItemCache = new IdentityHashMap<>();
+        Set<BlockPos> positions = new LinkedHashSet<>();
+        BlockPos min = center.add(-radius, -radius, -radius);
+        BlockPos max = center.add(radius, radius, radius);
 
-	public static WorldPos getWorldPos(ScreenHandlerContext context) {
-		Optional<WorldPos> result = context.get((world, pos) -> new WorldPos(world, pos));
-		return result.orElse(null);
-	}
+        for (BlockPos pos : BlockPos.iterate(min, max)) {
+            if (!world.isChunkLoaded(pos)) {
+                continue;
+            }
 
-	public record NearbyItemEntry(ItemStack stack, int count) {
-	}
+            // We use a modified getStorageAt that doesn't consume the visit, but checks it
+            Storage<ItemVariant> storage =
+                    getStorageAndCacheConfig(world, pos, visitedCache, hasItemCache, item);
 
-	public record WorldPos(World world, BlockPos pos) {
-	}
+            if (storage != null) {
+                // If we got a storage, it means it has the item (checked inside helper)
+                positions.add(pos.toImmutable());
+            }
+        }
 
-	private static boolean inventoryHasItem(Inventory inventory, Item item) {
-		for (int i = 0; i < inventory.size(); i++) {
-			ItemStack stack = inventory.getStack(i);
-			if (!stack.isEmpty() && stack.getItem() == item) {
-				return true;
-			}
-		}
-		return false;
-	}
+        return new ArrayList<>(positions);
+    }
+
+    private static Storage<ItemVariant> getStorageAndCacheConfig(
+            World world,
+            BlockPos pos,
+            Set<Object> visitedIdentities,
+            Map<Object, Boolean> hasItemCache,
+            Item item) {
+        // This is tricky: we want to map pos -> storage, then storage -> hasItem.
+        // But we also want to return the storage ONLY if it has the item.
+        // And we want to return it for ALL positions that map to this storage.
+
+        // 1. Try SIDED
+        Storage<ItemVariant> storage = ItemStorage.SIDED.find(world, pos, null);
+        Object key = storage;
+
+        if (storage == null) {
+            Inventory inventory = HopperBlockEntity.getInventoryAt(world, pos);
+            if (inventory != null && !(inventory instanceof PlayerInventory)) {
+                key = inventory;
+                // We wrap it only if we need to check it
+            } else {
+                return null;
+            }
+        }
+
+        // Check cache
+        if (hasItemCache.containsKey(key)) {
+            return hasItemCache.get(key)
+                    ? (storage != null ? storage : InventoryStorage.of((Inventory) key, null))
+                    : null;
+        }
+
+        // Not in cache, verify
+        Storage<ItemVariant> toCheck = storage;
+        if (toCheck == null) {
+            toCheck = InventoryStorage.of((Inventory) key, null);
+        }
+
+        boolean has = false;
+        for (StorageView<ItemVariant> view : toCheck) {
+            if (view.getResource().getItem() == item && view.getAmount() > 0) {
+                has = true;
+                break;
+            }
+        }
+
+        hasItemCache.put(key, has);
+        return has ? toCheck : null;
+    }
+
+    public static WorldPos getWorldPos(ScreenHandlerContext context) {
+        Optional<WorldPos> result = context.get((world, pos) -> new WorldPos(world, pos));
+        return result.orElse(null);
+    }
+
+    public record NearbyItemEntry(ItemStack stack, int count) {}
+
+    public record WorldPos(World world, BlockPos pos) {}
 }
