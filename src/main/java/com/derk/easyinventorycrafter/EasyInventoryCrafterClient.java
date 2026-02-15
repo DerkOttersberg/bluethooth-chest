@@ -1,32 +1,53 @@
 package com.derk.easyinventorycrafter;
 
 import com.derk.easyinventorycrafter.client.NearbyItemsClientState;
-import com.derk.easyinventorycrafter.net.NearbyItemsPayload;
-import com.derk.easyinventorycrafter.net.NearbyHighlightResponsePayload;
+import com.derk.easyinventorycrafter.NearbyInventoryScanner.NearbyItemEntry;
+import com.derk.easyinventorycrafter.net.NetworkChannels;
+import java.util.ArrayList;
+import java.util.List;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.CraftingScreen;
-import net.minecraft.client.render.DrawStyle;
-import net.minecraft.block.BlockState;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.render.Tessellator;
+import net.minecraft.client.render.VertexFormat;
+import net.minecraft.client.render.VertexFormats;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
-import net.minecraft.util.math.ColorHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.world.debug.gizmo.GizmoDrawing;
+import com.mojang.blaze3d.systems.RenderSystem;
+import org.joml.Matrix4f;
 
 public class EasyInventoryCrafterClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
-		ClientPlayNetworking.registerGlobalReceiver(NearbyItemsPayload.ID, (payload, context) -> {
-			NearbyItemsClientState.applyPayload(payload);
+		ClientPlayNetworking.registerGlobalReceiver(NetworkChannels.NEARBY_ITEMS, (client, handler, buf, responseSender) -> {
+			int size = buf.readVarInt();
+			List<NearbyItemEntry> receivedEntries = new ArrayList<>(size);
+			for (int i = 0; i < size; i++) {
+				ItemStack stack = buf.readItemStack();
+				int count = buf.readVarInt();
+				receivedEntries.add(new NearbyItemEntry(stack, count));
+			}
+			client.execute(() -> NearbyItemsClientState.setEntries(receivedEntries));
 		});
 
-		ClientPlayNetworking.registerGlobalReceiver(NearbyHighlightResponsePayload.ID, (payload, context) -> {
-			NearbyItemsClientState.setHighlight(payload.positions(), 100);
+		ClientPlayNetworking.registerGlobalReceiver(NetworkChannels.HIGHLIGHT_RESPONSE, (client, handler, buf, responseSender) -> {
+			int size = buf.readVarInt();
+			List<BlockPos> positions = new ArrayList<>(size);
+			for (int i = 0; i < size; i++) {
+				positions.add(buf.readBlockPos());
+			}
+			client.execute(() -> NearbyItemsClientState.setHighlight(positions, 100));
 		});
 
 		ClientTickEvents.END_CLIENT_TICK.register(new ClientTickEvents.EndTick() {
@@ -48,7 +69,7 @@ public class EasyInventoryCrafterClient implements ClientModInitializer {
 			}
 		});
 
-		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context -> {
+		WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
 			if (!NearbyItemsClientState.hasHighlight()) {
 				return;
 			}
@@ -56,63 +77,104 @@ public class EasyInventoryCrafterClient implements ClientModInitializer {
 			if (world == null) {
 				return;
 			}
-			int baseColor = ColorHelper.getArgb(255, 255, 215, 0);
 			float alpha = NearbyItemsClientState.getHighlightAlpha();
-			int strokeColor = ColorHelper.withAlpha(alpha, baseColor);
-			float lineWidth = 3.0f;
-			Vec3d cameraPos = MinecraftClient.getInstance().gameRenderer.getCamera().getCameraPos();
-			try (var ignored = context.worldRenderer().startDrawingGizmos()) {
-				for (BlockPos pos : NearbyItemsClientState.getHighlightPositions()) {
-					BlockState state = world.getBlockState(pos);
-					if (state.isAir()) {
-						continue;
-					}
-					VoxelShape shape = state.getOutlineShape(world, pos);
-					if (shape.isEmpty()) {
-						continue;
-					}
-					for (Box shapeBox : shape.getBoundingBoxes()) {
-						Box box = shapeBox.offset(pos).expand(0.002);
-						drawVisibleBoxLines(box, strokeColor, lineWidth, cameraPos);
-					}
+			Vec3d cameraPos = context.camera().getPos();
+
+			MatrixStack matrices = context.matrixStack();
+			matrices.push();
+			matrices.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
+
+			RenderSystem.enableBlend();
+			RenderSystem.defaultBlendFunc();
+			RenderSystem.disableDepthTest();
+			RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+			RenderSystem.lineWidth(3.0f);
+
+			Tessellator tessellator = Tessellator.getInstance();
+			BufferBuilder buffer = tessellator.getBuffer();
+			buffer.begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
+
+			Matrix4f matrix = matrices.peek().getPositionMatrix();
+			float r = 1.0f;
+			float g = 215.0f / 255.0f;
+			float b = 0.0f;
+
+			for (BlockPos pos : NearbyItemsClientState.getHighlightPositions()) {
+				BlockState state = world.getBlockState(pos);
+				if (state.isAir()) {
+					continue;
+				}
+				VoxelShape shape = state.getOutlineShape(world, pos);
+				if (shape.isEmpty()) {
+					continue;
+				}
+				for (Box shapeBox : shape.getBoundingBoxes()) {
+					Box box = shapeBox.offset(pos).expand(0.002);
+					drawVisibleBoxLines(buffer, matrix, box, r, g, b, alpha, cameraPos);
 				}
 			}
+
+			tessellator.draw();
+
+			RenderSystem.enableDepthTest();
+			RenderSystem.disableBlend();
+
+			matrices.pop();
 		});
 	}
 
-	private static void drawVisibleBoxLines(Box box, int color, float width, Vec3d cameraPos) {
-		Vec3d v000 = new Vec3d(box.minX, box.minY, box.minZ);
-		Vec3d v001 = new Vec3d(box.minX, box.minY, box.maxZ);
-		Vec3d v010 = new Vec3d(box.minX, box.maxY, box.minZ);
-		Vec3d v011 = new Vec3d(box.minX, box.maxY, box.maxZ);
-		Vec3d v100 = new Vec3d(box.maxX, box.minY, box.minZ);
-		Vec3d v101 = new Vec3d(box.maxX, box.minY, box.maxZ);
-		Vec3d v110 = new Vec3d(box.maxX, box.maxY, box.minZ);
-		Vec3d v111 = new Vec3d(box.maxX, box.maxY, box.maxZ);
+	private static void drawVisibleBoxLines(BufferBuilder buffer, Matrix4f matrix, Box box,
+			float r, float g, float b, float a, Vec3d cameraPos) {
+		float x0 = (float) box.minX;
+		float y0 = (float) box.minY;
+		float z0 = (float) box.minZ;
+		float x1 = (float) box.maxX;
+		float y1 = (float) box.maxY;
+		float z1 = (float) box.maxZ;
+
 		Vec3d center = box.getCenter();
 		Vec3d toCamera = cameraPos.subtract(center);
 
 		if (toCamera.x > 0.0) {
-			drawFaceEdges(v000, v001, v011, v010, color, width); // -X face
+			// -X face
+			drawFaceEdges(buffer, matrix, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0, r, g, b, a);
 		} else {
-			drawFaceEdges(v100, v101, v111, v110, color, width); // +X face
+			// +X face
+			drawFaceEdges(buffer, matrix, x1, y0, z0, x1, y0, z1, x1, y1, z1, x1, y1, z0, r, g, b, a);
 		}
 		if (toCamera.y > 0.0) {
-			drawFaceEdges(v000, v100, v101, v001, color, width); // -Y face
+			// -Y face
+			drawFaceEdges(buffer, matrix, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, r, g, b, a);
 		} else {
-			drawFaceEdges(v010, v110, v111, v011, color, width); // +Y face
+			// +Y face
+			drawFaceEdges(buffer, matrix, x0, y1, z0, x1, y1, z0, x1, y1, z1, x0, y1, z1, r, g, b, a);
 		}
 		if (toCamera.z > 0.0) {
-			drawFaceEdges(v000, v100, v110, v010, color, width); // -Z face
+			// -Z face
+			drawFaceEdges(buffer, matrix, x0, y0, z0, x1, y0, z0, x1, y1, z0, x0, y1, z0, r, g, b, a);
 		} else {
-			drawFaceEdges(v001, v101, v111, v011, color, width); // +Z face
+			// +Z face
+			drawFaceEdges(buffer, matrix, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1, r, g, b, a);
 		}
 	}
 
-	private static void drawFaceEdges(Vec3d a, Vec3d b, Vec3d c, Vec3d d, int color, float width) {
-		GizmoDrawing.line(a, b, color, width).ignoreOcclusion();
-		GizmoDrawing.line(b, c, color, width).ignoreOcclusion();
-		GizmoDrawing.line(c, d, color, width).ignoreOcclusion();
-		GizmoDrawing.line(d, a, color, width).ignoreOcclusion();
+	private static void drawFaceEdges(BufferBuilder buffer, Matrix4f matrix,
+			float ax, float ay, float az,
+			float bx, float by, float bz,
+			float cx, float cy, float cz,
+			float dx, float dy, float dz,
+			float r, float g, float b, float a) {
+		line(buffer, matrix, ax, ay, az, bx, by, bz, r, g, b, a);
+		line(buffer, matrix, bx, by, bz, cx, cy, cz, r, g, b, a);
+		line(buffer, matrix, cx, cy, cz, dx, dy, dz, r, g, b, a);
+		line(buffer, matrix, dx, dy, dz, ax, ay, az, r, g, b, a);
+	}
+
+	private static void line(BufferBuilder buffer, Matrix4f matrix,
+			float x1, float y1, float z1,
+			float x2, float y2, float z2,
+			float r, float g, float b, float a) {
+		buffer.vertex(matrix, x1, y1, z1).color(r, g, b, a).next();
+		buffer.vertex(matrix, x2, y2, z2).color(r, g, b, a).next();
 	}
 }

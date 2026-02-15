@@ -1,16 +1,16 @@
 package com.derk.easyinventorycrafter.client;
 
 import com.derk.easyinventorycrafter.NearbyInventoryScanner.NearbyItemEntry;
+import com.derk.easyinventorycrafter.net.NetworkChannels;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import com.derk.easyinventorycrafter.net.NearbyItemsPayload;
-import com.derk.easyinventorycrafter.net.RequestNearbyItemsPayload;
-import com.derk.easyinventorycrafter.net.NearbyHighlightRequestPayload;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.util.math.BlockPos;
 
 public final class NearbyItemsClientState {
 	private static List<NearbyItemEntry> entries = Collections.emptyList();
@@ -33,21 +33,25 @@ public final class NearbyItemsClientState {
 	}
 
 	public static void requestUpdate() {
-		if (ClientPlayNetworking.canSend(RequestNearbyItemsPayload.ID)) {
-			ClientPlayNetworking.send(new RequestNearbyItemsPayload());
+		if (ClientPlayNetworking.canSend(NetworkChannels.REQUEST_NEARBY_ITEMS)) {
+			ClientPlayNetworking.send(NetworkChannels.REQUEST_NEARBY_ITEMS, PacketByteBufs.empty());
 		}
 	}
 
-	public static void applyPayload(NearbyItemsPayload payload) {
-		entries = payload.entries();
+	public static void setEntries(List<NearbyItemEntry> newEntries) {
+		entries = newEntries;
 	}
 
 	public static void requestHighlight(ItemStack stack) {
 		if (stack == null || stack.isEmpty()) {
 			return;
 		}
-		if (ClientPlayNetworking.canSend(NearbyHighlightRequestPayload.ID)) {
-			ClientPlayNetworking.send(new NearbyHighlightRequestPayload(stack.copyWithCount(1)));
+		if (ClientPlayNetworking.canSend(NetworkChannels.HIGHLIGHT_REQUEST)) {
+			PacketByteBuf buf = PacketByteBufs.create();
+			ItemStack copy = stack.copy();
+			copy.setCount(1);
+			buf.writeItemStack(copy);
+			ClientPlayNetworking.send(NetworkChannels.HIGHLIGHT_REQUEST, buf);
 		}
 	}
 

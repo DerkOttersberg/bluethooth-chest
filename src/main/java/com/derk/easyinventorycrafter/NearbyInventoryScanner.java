@@ -13,11 +13,9 @@ import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Item;
 import net.minecraft.screen.ScreenHandlerContext;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import org.jspecify.annotations.Nullable;
 
 public final class NearbyInventoryScanner {
 	public static final int DEFAULT_RADIUS = 16;
@@ -56,7 +54,7 @@ public final class NearbyInventoryScanner {
 		for (Inventory inventory : inventories) {
 			for (int i = 0; i < inventory.size(); i++) {
 				ItemStack stack = inventory.getStack(i);
-				if (!stack.isEmpty() && PlayerInventory.usableWhenFillingSlot(stack)) {
+				if (!stack.isEmpty()) {
 					totals.merge(stack.getItem(), stack.getCount(), Integer::sum);
 				}
 			}
@@ -75,7 +73,6 @@ public final class NearbyInventoryScanner {
 		return entries;
 	}
 
-	@Nullable
 	public static BlockPos findFirstInventoryPosWithItem(World world, BlockPos center, int radius, Item item) {
 		BlockPos min = center.add(-radius, -radius, -radius);
 		BlockPos max = center.add(radius, radius, radius);
@@ -89,7 +86,7 @@ public final class NearbyInventoryScanner {
 			}
 			for (int i = 0; i < inventory.size(); i++) {
 				ItemStack stack = inventory.getStack(i);
-				if (!stack.isEmpty() && stack.getItem() == item && PlayerInventory.usableWhenFillingSlot(stack)) {
+				if (!stack.isEmpty() && stack.getItem() == item) {
 					return pos.toImmutable();
 				}
 			}
@@ -123,7 +120,6 @@ public final class NearbyInventoryScanner {
 		return new ArrayList<>(positions);
 	}
 
-	@Nullable
 	public static WorldPos getWorldPos(ScreenHandlerContext context) {
 		Optional<WorldPos> result = context.get((world, pos) -> new WorldPos(world, pos));
 		return result.orElse(null);
@@ -138,7 +134,7 @@ public final class NearbyInventoryScanner {
 	private static boolean inventoryHasItem(Inventory inventory, Item item) {
 		for (int i = 0; i < inventory.size(); i++) {
 			ItemStack stack = inventory.getStack(i);
-			if (!stack.isEmpty() && stack.getItem() == item && PlayerInventory.usableWhenFillingSlot(stack)) {
+			if (!stack.isEmpty() && stack.getItem() == item) {
 				return true;
 			}
 		}

@@ -3,19 +3,17 @@ package com.derk.easyinventorycrafter.mixin;
 import com.derk.easyinventorycrafter.client.NearbyItemsClientState;
 import com.derk.easyinventorycrafter.client.NearbyPanelAccess;
 import com.derk.easyinventorycrafter.NearbyInventoryScanner.NearbyItemEntry;
+import com.derk.easyinventorycrafter.util.FormatUtils;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.ScreenRect;
-import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.gui.screen.ingame.CraftingScreen;
-import net.minecraft.client.gui.screen.recipebook.CraftingRecipeBookWidget;
-import net.minecraft.client.gui.screen.ingame.RecipeBookScreen;
+import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.client.sound.SoundManager;
-import net.minecraft.component.DataComponentTypes;
+import net.minecraft.item.FoodComponent;
 import net.minecraft.text.Text;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.screen.CraftingScreenHandler;
@@ -31,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(CraftingScreen.class)
-public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScreenHandler> implements NearbyPanelAccess {
+public abstract class CraftingScreenMixin extends HandledScreen<CraftingScreenHandler> implements NearbyPanelAccess {
 	@Unique
 	private ButtonWidget derk$nearbyButton;
 
@@ -51,7 +49,7 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 	private long derk$lastClickTick = -1000L;
 
 	protected CraftingScreenMixin(CraftingScreenHandler handler, PlayerInventory inventory, Text title) {
-		super(handler, new CraftingRecipeBookWidget(handler), inventory, title);
+		super(handler, inventory, title);
 	}
 
 	@Inject(method = "init", at = @At("TAIL"))
@@ -134,8 +132,8 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 			int itemY = startY + row * slotSize + 1;
 			NearbyItemEntry entry = entries.get(index);
 			context.drawItem(entry.stack(), itemX, itemY);
-			String count = derk$formatCount(entry.count());
-			context.drawStackOverlay(this.textRenderer, entry.stack(), itemX, itemY, count);
+			String count = FormatUtils.formatCount(entry.count());
+			context.drawItemInSlot(this.textRenderer, entry.stack(), itemX, itemY, count);
 		}
 
 		int hoveredIndex = derk$getHoveredIndex(mouseX, mouseY, entries.size(), panelX, panelY);
@@ -148,12 +146,10 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 	}
 
 	@Override
-	public boolean derk$handleMouseClick(Click click, boolean doubleClick) {
-		if (!this.derk$nearbyOpen || click.button() != 0) {
+	public boolean derk$handleMouseClick(double mouseX, double mouseY, int button) {
+		if (!this.derk$nearbyOpen || button != 0) {
 			return false;
 		}
-		double mouseX = click.x();
-		double mouseY = click.y();
 		int panelX = this.x + this.backgroundWidth + 6;
 		int panelY = this.y + 48;
 		int columns = 4;
@@ -177,7 +173,7 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 		this.derk$lastClickIndex = index;
 		this.derk$lastClickTick = MinecraftClient.getInstance().world == null ? 0L : MinecraftClient.getInstance().world.getTime();
 		SoundManager soundManager = MinecraftClient.getInstance().getSoundManager();
-		soundManager.play(net.minecraft.client.sound.PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+		soundManager.play(net.minecraft.client.sound.PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.0f));
 		return true;
 	}
 
@@ -260,11 +256,11 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 	}
 
 	@Override
-	public boolean derk$handleCharTyped(net.minecraft.client.input.CharInput input) {
+	public boolean derk$handleCharTyped(char chr, int modifiers) {
 		if (!this.derk$nearbyOpen) {
 			return false;
 		}
-		if (this.derk$searchField != null && this.derk$searchField.charTyped(input)) {
+		if (this.derk$searchField != null && this.derk$searchField.charTyped(chr, modifiers)) {
 			this.derk$scrollOffset = 0;
 			return true;
 		}
@@ -272,11 +268,11 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 	}
 
 	@Override
-	public boolean derk$handleKeyPressed(net.minecraft.client.input.KeyInput input) {
+	public boolean derk$handleKeyPressed(int keyCode, int scanCode, int modifiers) {
 		if (!this.derk$nearbyOpen) {
 			return false;
 		}
-		if (this.derk$searchField != null && this.derk$searchField.keyPressed(input)) {
+		if (this.derk$searchField != null && this.derk$searchField.keyPressed(keyCode, scanCode, modifiers)) {
 			this.derk$scrollOffset = 0;
 			return true;
 		}
@@ -315,22 +311,9 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 				|| stack.isIn(ItemTags.EMERALD_ORES)) {
 			return 1;
 		}
-		if (stack.get(DataComponentTypes.FOOD) != null) {
+		if (stack.getItem().getFoodComponent() != null) {
 			return 2;
 		}
 		return 3;
-	}
-
-	private static String derk$formatCount(int count) {
-		if (count < 1000) {
-			return String.valueOf(count);
-		}
-		if (count < 1000000) {
-			return (count / 1000) + "k";
-		}
-		if (count < 1000000000) {
-			return (count / 1000000) + "M";
-		}
-		return (count / 1000000000) + "B";
 	}
 }

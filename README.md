@@ -11,12 +11,17 @@ Craft straight from nearby chests at the vanilla crafting table.
 - One-set crafting with spacebar.
 
 ## Development
-- Minecraft: 1.21.11
-- Fabric Loader: 0.18.4
-- Yarn: 1.21.11+build.4
-- Fabric API: 0.141.1+1.21.11
-- Java: 21
+- Minecraft: 1.20.1
+- Fabric Loader: 0.15.11
+- Yarn: 1.20.1+build.10
+- Fabric API: 0.92.2+1.20.1
+- Java: 17
 
 ## Run (client)
 1. Run `gradlew runClient` from the project root.
 2. Open a world and use a crafting table near chests to test.
+
+## Testing
+```bash
+./gradlew test
+```

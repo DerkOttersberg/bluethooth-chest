@@ -1,15 +1,11 @@
 package com.derk.easyinventorycrafter.client;
 
-import net.minecraft.client.input.CharInput;
-import net.minecraft.client.input.KeyInput;
-import net.minecraft.client.gui.Click;
-
 public interface NearbyPanelAccess {
 	boolean derk$handleScroll(double mouseX, double mouseY, double verticalAmount);
 
-	boolean derk$handleCharTyped(CharInput input);
+	boolean derk$handleCharTyped(char chr, int modifiers);
 
-	boolean derk$handleKeyPressed(KeyInput input);
+	boolean derk$handleKeyPressed(int keyCode, int scanCode, int modifiers);
 
-	boolean derk$handleMouseClick(Click click, boolean doubleClick);
+	boolean derk$handleMouseClick(double mouseX, double mouseY, int button);
 }

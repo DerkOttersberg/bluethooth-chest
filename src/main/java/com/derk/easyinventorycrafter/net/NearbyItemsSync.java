@@ -5,12 +5,14 @@ import com.derk.easyinventorycrafter.NearbyInventoryScanner;
 import com.derk.easyinventorycrafter.NearbyInventoryScanner.NearbyItemEntry;
 import com.derk.easyinventorycrafter.NearbyInventoryScanner.WorldPos;
 import java.util.List;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.screen.CraftingScreenHandler;
 import net.minecraft.screen.ScreenHandlerContext;
 import net.minecraft.server.network.ServerPlayerEntity;
-import org.jspecify.annotations.Nullable;
+import net.minecraft.util.math.BlockPos;
 
 public final class NearbyItemsSync {
 	private NearbyItemsSync() {
@@ -37,10 +39,24 @@ public final class NearbyItemsSync {
 				NearbyInventoryScanner.DEFAULT_RADIUS
 		);
 
-		ServerPlayNetworking.send(player, new NearbyItemsPayload(entries));
+		PacketByteBuf buf = PacketByteBufs.create();
+		buf.writeVarInt(entries.size());
+		for (NearbyItemEntry entry : entries) {
+			buf.writeItemStack(entry.stack());
+			buf.writeVarInt(entry.count());
+		}
+		ServerPlayNetworking.send(player, NetworkChannels.NEARBY_ITEMS, buf);
 	}
 
-	@Nullable
+	public static void sendHighlightResponse(ServerPlayerEntity player, List<BlockPos> positions) {
+		PacketByteBuf buf = PacketByteBufs.create();
+		buf.writeVarInt(positions.size());
+		for (BlockPos pos : positions) {
+			buf.writeBlockPos(pos);
+		}
+		ServerPlayNetworking.send(player, NetworkChannels.HIGHLIGHT_RESPONSE, buf);
+	}
+
 	private static ScreenHandlerContext getContext(ServerPlayerEntity player) {
 		if (player.currentScreenHandler instanceof NearbyCraftingAccess access) {
 			return access.derk$getContext();
@@ -49,8 +65,7 @@ public final class NearbyItemsSync {
 		return null;
 	}
 
-	@Nullable
-	public static List<net.minecraft.util.math.BlockPos> findHighlightPositions(ServerPlayerEntity player, ItemStack stack) {
+	public static List<BlockPos> findHighlightPositions(ServerPlayerEntity player, ItemStack stack) {
 		ScreenHandlerContext context = getContext(player);
 		if (context == null) {
 			return null;

@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "refmap": "derk_easy_inventory_crafter.refmap.json",
   "package": "com.derk.easyinventorycrafter.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_17",
   "mixins": [
     "AbstractCraftingScreenHandlerMixin",
     "CraftingResultSlotMixin",
