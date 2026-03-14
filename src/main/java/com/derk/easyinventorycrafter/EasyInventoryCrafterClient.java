@@ -12,6 +12,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.CraftingScreen;
 import net.minecraft.client.render.RenderLayers;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
@@ -57,6 +58,7 @@ public class EasyInventoryCrafterClient implements ClientModInitializer {
 				return;
 			}
 
+			PlayerEntity player = client.player;
 			Vec3d cameraPos = client.gameRenderer.getCamera().getCameraPos();
 			float alpha = NearbyItemsClientState.getHighlightAlpha();
 
@@ -76,10 +78,22 @@ public class EasyInventoryCrafterClient implements ClientModInitializer {
 					continue;
 				}
 
+				Box fullBox = shape.getBoundingBox().offset(pos).expand(0.002);
+
 				for (Box shapeBox : shape.getBoundingBoxes()) {
 					Box box = shapeBox.offset(pos).expand(0.002);
 					EasyHighlightRenderer.renderBox(matrices, consumer, cameraPos, box, alpha);
 				}
+
+				EasyHighlightRenderer.renderDistanceLabel(
+					client,
+					matrices,
+					context.consumers(),
+					cameraPos,
+					fullBox,
+					player == null ? cameraPos : player.getEyePos(),
+					alpha
+				);
 			}
 
 			matrices.pop();
