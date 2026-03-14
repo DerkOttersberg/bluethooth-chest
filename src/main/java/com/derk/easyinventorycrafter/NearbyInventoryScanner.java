@@ -2,12 +2,14 @@ package com.derk.easyinventorycrafter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.LinkedHashSet;
+import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.HopperBlockEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.inventory.Inventory;
@@ -27,8 +29,9 @@ public final class NearbyInventoryScanner {
 	}
 
 	public static List<Inventory> findNearbyInventories(World world, BlockPos center, int radius) {
-		Map<Inventory, Boolean> seen = new IdentityHashMap<>();
+		Set<BlockEntity> seenEntities = new HashSet<>();
 		List<Inventory> inventories = new ArrayList<>();
+
 		BlockPos min = center.add(-radius, -radius, -radius);
 		BlockPos max = center.add(radius, radius, radius);
 
@@ -37,11 +40,15 @@ public final class NearbyInventoryScanner {
 				continue;
 			}
 
-			Inventory inventory = HopperBlockEntity.getInventoryAt(world, pos);
+			BlockEntity blockEntity = world.getBlockEntity(pos);
+			if (!(blockEntity instanceof Inventory inventory)) {
+				continue;
+			}
 			if (inventory instanceof PlayerInventory) {
 				continue;
 			}
-			if (inventory != null && seen.putIfAbsent(inventory, Boolean.TRUE) == null) {
+
+			if (seenEntities.add(blockEntity)) {
 				inventories.add(inventory);
 			}
 		}
@@ -79,17 +86,30 @@ public final class NearbyInventoryScanner {
 	public static BlockPos findFirstInventoryPosWithItem(World world, BlockPos center, int radius, Item item) {
 		BlockPos min = center.add(-radius, -radius, -radius);
 		BlockPos max = center.add(radius, radius, radius);
+
+		Set<BlockEntity> seenEntities = new HashSet<>();
+
 		for (BlockPos pos : BlockPos.iterate(min, max)) {
 			if (!world.isChunkLoaded(pos)) {
 				continue;
 			}
-			Inventory inventory = HopperBlockEntity.getInventoryAt(world, pos);
-			if (inventory == null || inventory instanceof PlayerInventory) {
+
+			BlockEntity blockEntity = world.getBlockEntity(pos);
+			if (!(blockEntity instanceof Inventory inventory)) {
 				continue;
 			}
+			if (inventory instanceof PlayerInventory) {
+				continue;
+			}
+			if (!seenEntities.add(blockEntity)) {
+				continue;
+			}
+
 			for (int i = 0; i < inventory.size(); i++) {
 				ItemStack stack = inventory.getStack(i);
-				if (!stack.isEmpty() && stack.getItem() == item && PlayerInventory.usableWhenFillingSlot(stack)) {
+				if (!stack.isEmpty()
+						&& stack.getItem() == item
+						&& PlayerInventory.usableWhenFillingSlot(stack)) {
 					return pos.toImmutable();
 				}
 			}
@@ -98,8 +118,9 @@ public final class NearbyInventoryScanner {
 	}
 
 	public static List<BlockPos> findInventoryPositionsWithItem(World world, BlockPos center, int radius, Item item) {
-		Map<Inventory, Boolean> cache = new IdentityHashMap<>();
+		Set<BlockEntity> seenEntities = new HashSet<>();
 		Set<BlockPos> positions = new LinkedHashSet<>();
+
 		BlockPos min = center.add(-radius, -radius, -radius);
 		BlockPos max = center.add(radius, radius, radius);
 
@@ -107,15 +128,19 @@ public final class NearbyInventoryScanner {
 			if (!world.isChunkLoaded(pos)) {
 				continue;
 			}
-			Inventory inventory = HopperBlockEntity.getInventoryAt(world, pos);
+
+			BlockEntity blockEntity = world.getBlockEntity(pos);
+			if (!(blockEntity instanceof Inventory inventory)) {
+				continue;
+			}
 			if (inventory instanceof PlayerInventory) {
 				continue;
 			}
-			if (inventory == null) {
+			if (!seenEntities.add(blockEntity)) {
 				continue;
 			}
-			boolean hasItem = cache.computeIfAbsent(inventory, inv -> inventoryHasItem(inv, item));
-			if (hasItem) {
+
+			if (inventoryHasItem(inventory, item)) {
 				positions.add(pos.toImmutable());
 			}
 		}
@@ -138,7 +163,9 @@ public final class NearbyInventoryScanner {
 	private static boolean inventoryHasItem(Inventory inventory, Item item) {
 		for (int i = 0; i < inventory.size(); i++) {
 			ItemStack stack = inventory.getStack(i);
-			if (!stack.isEmpty() && stack.getItem() == item && PlayerInventory.usableWhenFillingSlot(stack)) {
+			if (!stack.isEmpty()
+					&& stack.getItem() == item
+					&& PlayerInventory.usableWhenFillingSlot(stack)) {
 				return true;
 			}
 		}
