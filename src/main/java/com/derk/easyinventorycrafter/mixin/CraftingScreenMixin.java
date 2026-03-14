@@ -3,14 +3,17 @@ package com.derk.easyinventorycrafter.mixin;
 import com.derk.easyinventorycrafter.client.NearbyItemsClientState;
 import com.derk.easyinventorycrafter.client.NearbyPanelAccess;
 import com.derk.easyinventorycrafter.NearbyInventoryScanner.NearbyItemEntry;
+import com.derk.easyinventorycrafter.net.ReturnNearbyItemsPayload;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.ScreenRect;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.screen.ingame.CraftingScreen;
 import net.minecraft.client.gui.screen.recipebook.CraftingRecipeBookWidget;
 import net.minecraft.client.gui.screen.ingame.RecipeBookScreen;
@@ -34,6 +37,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScreenHandler> implements NearbyPanelAccess {
 	@Unique
 	private ButtonWidget derk$nearbyButton;
+
+	@Unique
+	private ButtonWidget derk$cancelButton;
 
 	@Unique
 	private TextFieldWidget derk$searchField;
@@ -68,6 +74,10 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 				.dimensions(buttonX, buttonY, 60, 20)
 				.build();
 		this.derk$nearbyButton = this.addDrawableChild(button);
+		this.derk$cancelButton = this.addDrawableChild(ButtonWidget.builder(Text.of("X"), btn -> ClientPlayNetworking.send(new ReturnNearbyItemsPayload()))
+				.dimensions(buttonX + 64, buttonY, 20, 20)
+				.tooltip(Tooltip.of(Text.of("Returns nearby items to chest")))
+				.build());
 		this.derk$searchField = new TextFieldWidget(this.textRenderer, buttonX, buttonY + 24, 84, 14, Text.of(""));
 		this.derk$searchField.setMaxLength(50);
 		this.derk$searchField.setPlaceholder(Text.of("Search..."));
@@ -81,6 +91,10 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 		if (this.derk$nearbyButton != null) {
 			this.derk$nearbyButton.setX(this.x + this.backgroundWidth + 6);
 			this.derk$nearbyButton.setY(this.y + 6);
+		}
+		if (this.derk$cancelButton != null) {
+			this.derk$cancelButton.setX(this.x + this.backgroundWidth + 70);
+			this.derk$cancelButton.setY(this.y + 6);
 		}
 		if (this.derk$searchField != null) {
 			this.derk$searchField.setX(this.x + this.backgroundWidth + 6);

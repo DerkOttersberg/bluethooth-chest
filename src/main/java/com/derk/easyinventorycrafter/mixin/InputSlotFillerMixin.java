@@ -91,6 +91,7 @@ public abstract class InputSlotFillerMixin {
 					continue;
 				}
 
+				int baselineCount = slotStack.isEmpty() ? 0 : slotStack.getCount();
 				int removeCount = Math.min(remaining, stack.getCount());
 				ItemStack removed = inv.removeStack(i, removeCount);
 				if (removed.isEmpty()) {
@@ -105,6 +106,7 @@ public abstract class InputSlotFillerMixin {
 					slot.markDirty();
 				}
 
+				access.derk$recordNearbyWithdrawal(inv, i, this.derk$getCraftingSlotIndex(screenHandler, slot), removed, removed.getCount(), baselineCount);
 				inv.markDirty();
 				remaining -= removed.getCount();
 				if (remaining <= 0) {
@@ -210,5 +212,15 @@ public abstract class InputSlotFillerMixin {
 		}
 
 		return null;
+	}
+
+	private int derk$getCraftingSlotIndex(AbstractCraftingScreenHandler screenHandler, Slot slot) {
+		List<Slot> inputSlots = screenHandler.getInputSlots();
+		for (int i = 0; i < inputSlots.size(); i++) {
+			if (inputSlots.get(i) == slot) {
+				return i;
+			}
+		}
+		return -1;
 	}
 }

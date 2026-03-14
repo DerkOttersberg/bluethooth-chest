@@ -1,5 +1,6 @@
 package com.derk.easyinventorycrafter.mixin;
 
+import com.derk.easyinventorycrafter.AbstractCraftingScreenHandlerAccess;
 import com.derk.easyinventorycrafter.NearbyCraftingAccess;
 import com.derk.easyinventorycrafter.NearbyInventoryScanner;
 import com.derk.easyinventorycrafter.NearbyInventoryScanner.WorldPos;
@@ -9,13 +10,25 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.recipe.RecipeFinder;
 import net.minecraft.screen.AbstractCraftingScreenHandler;
 import net.minecraft.screen.ScreenHandlerContext;
+import net.minecraft.inventory.RecipeInputInventory;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(AbstractCraftingScreenHandler.class)
-public class AbstractCraftingScreenHandlerMixin {
+public class AbstractCraftingScreenHandlerMixin implements AbstractCraftingScreenHandlerAccess {
+	@Shadow
+	@Final
+	protected RecipeInputInventory craftingInventory;
+
+	@Override
+	public RecipeInputInventory derk$getCraftingInventory() {
+		return this.craftingInventory;
+	}
+
 	@Inject(method = "populateRecipeFinder", at = @At("TAIL"))
 	private void derk$addNearbyItems(RecipeFinder finder, CallbackInfo ci) {
 		if (!((Object)this instanceof NearbyCraftingAccess access)) {
