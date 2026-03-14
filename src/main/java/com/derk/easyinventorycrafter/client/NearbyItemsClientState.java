@@ -8,6 +8,7 @@ import com.derk.easyinventorycrafter.net.NearbyItemsPayload;
 import com.derk.easyinventorycrafter.net.RequestNearbyItemsPayload;
 import com.derk.easyinventorycrafter.net.NearbyHighlightRequestPayload;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.recipebook.RecipeBookProvider;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.item.ItemStack;
@@ -40,6 +41,12 @@ public final class NearbyItemsClientState {
 
 	public static void applyPayload(NearbyItemsPayload payload) {
 		entries = payload.entries();
+		MinecraftClient client = MinecraftClient.getInstance();
+		client.execute(() -> {
+			if (client.currentScreen instanceof RecipeBookProvider recipeBookProvider) {
+				recipeBookProvider.refreshRecipeBook();
+			}
+		});
 	}
 
 	public static void requestHighlight(ItemStack stack) {

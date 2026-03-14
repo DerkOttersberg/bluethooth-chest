@@ -12,6 +12,7 @@
     "InputSlotFillerMixin"
   ],
   "client": [
+    "AbstractCraftingScreenHandlerClientMixin",
     "CraftingScreenMixin",
     "RecipeBookScreenMixin",
     "RecipeBookWidgetMixin"

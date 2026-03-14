@@ -27,6 +27,9 @@ public class AbstractCraftingScreenHandlerMixin {
 		if (worldPos == null) {
 			return;
 		}
+		if (worldPos.world().isClient()) {
+			return;
+		}
 
 		List<Inventory> inventories = NearbyInventoryScanner.findNearbyInventories(
 				worldPos.world(),
