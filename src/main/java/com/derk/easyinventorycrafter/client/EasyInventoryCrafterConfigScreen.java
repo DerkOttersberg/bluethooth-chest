@@ -2,6 +2,7 @@ package com.derk.easyinventorycrafter.client;
 
 import com.derk.easyinventorycrafter.EasyInventoryCrafterConfig;
 import com.derk.easyinventorycrafter.EasyInventoryCrafterConfig.ConfigData;
+import com.derk.easyinventorycrafter.EasyInventoryCrafterConfig.LocateTrailParticle;
 import java.util.Locale;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -16,8 +17,11 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 	private ButtonWidget nearbyRadiusLabelButton;
 	private ButtonWidget highlightOpacityLabelButton;
 	private ButtonWidget autoRefreshLabelButton;
+	private ButtonWidget highlightEnabledLabelButton;
 	private ButtonWidget distanceLabelLabelButton;
 	private ButtonWidget snapAimLabelButton;
+	private ButtonWidget smokeTrailLabelButton;
+	private ButtonWidget trailParticleLabelButton;
 	private ButtonWidget panelDefaultLabelButton;
 	private TextFieldWidget highlightColorField;
 	private TextFieldWidget highlightDurationField;
@@ -25,11 +29,17 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 	private TextFieldWidget highlightOpacityField;
 	private TextFieldWidget autoRefreshField;
 	private ButtonWidget highlightColorPickerButton;
+	private boolean showHighlighter;
 	private boolean showDistanceLabel;
 	private boolean snapAimToChest;
+	private boolean showSmokeTrail;
+	private LocateTrailParticle locateTrailParticle;
 	private boolean nearbyPanelOpenByDefault;
+	private ButtonWidget highlightEnabledButton;
 	private ButtonWidget showDistanceLabelButton;
 	private ButtonWidget snapAimButton;
+	private ButtonWidget smokeTrailButton;
+	private ButtonWidget trailParticleButton;
 	private ButtonWidget panelDefaultButton;
 	private Text errorText = Text.empty();
 
@@ -41,8 +51,11 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 	@Override
 	protected void init() {
 		ConfigData config = EasyInventoryCrafterConfig.snapshot();
+		this.showHighlighter = config.showHighlighter;
 		this.showDistanceLabel = config.showDistanceLabel;
 		this.snapAimToChest = config.snapAimToChest;
+		this.showSmokeTrail = config.showLocateTrail;
+		this.locateTrailParticle = config.locateTrailParticle;
 		this.nearbyPanelOpenByDefault = config.nearbyPanelOpenByDefault;
 
 		int centerX = this.width / 2;
@@ -58,9 +71,12 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 		this.nearbyRadiusLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 2, labelButtonWidth, "Nearby Distance");
 		this.highlightOpacityLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 3, labelButtonWidth, "Highlight Opacity");
 		this.autoRefreshLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 4, labelButtonWidth, "Auto Refresh");
-		this.distanceLabelLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 5, labelButtonWidth, "Distance Label");
-		this.snapAimLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 6, labelButtonWidth, "Snap Aim To Chest");
-		this.panelDefaultLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 7, labelButtonWidth, "Panel Default");
+		this.highlightEnabledLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 5, labelButtonWidth, "Chest Highlighter");
+		this.distanceLabelLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 6, labelButtonWidth, "Distance Label");
+		this.snapAimLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 7, labelButtonWidth, "Snap Aim To Chest");
+		this.smokeTrailLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 8, labelButtonWidth, "Locate Trail");
+		this.trailParticleLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 9, labelButtonWidth, "Trail Particle");
+		this.panelDefaultLabelButton = this.derk$createLabelButton(labelButtonX, startY + rowHeight * 10, labelButtonWidth, "Panel Default");
 
 		this.highlightColorField = this.derk$createField(fieldX, startY, fieldWidth, String.format(Locale.ROOT, "#%06X", config.highlightColor));
 		this.highlightColorField.setPlaceholder(Text.of("#RRGGBB"));
@@ -76,20 +92,35 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 		this.autoRefreshField = this.derk$createField(fieldX, startY + rowHeight * 4, fieldWidth, this.derk$formatSeconds(config.autoRefreshTicks));
 		this.autoRefreshField.setPlaceholder(Text.of("Seconds"));
 
+		this.highlightEnabledButton = this.addDrawableChild(ButtonWidget.builder(this.derk$getHighlightEnabledText(), button -> {
+			this.showHighlighter = !this.showHighlighter;
+			button.setMessage(this.derk$getHighlightEnabledText());
+		}).dimensions(fieldX, startY + rowHeight * 5, 96, 20).build());
+
 		this.showDistanceLabelButton = this.addDrawableChild(ButtonWidget.builder(this.derk$getDistanceLabelText(), button -> {
 			this.showDistanceLabel = !this.showDistanceLabel;
 			button.setMessage(this.derk$getDistanceLabelText());
-		}).dimensions(fieldX, startY + rowHeight * 5, 96, 20).build());
+		}).dimensions(fieldX, startY + rowHeight * 6, 96, 20).build());
 
 		this.snapAimButton = this.addDrawableChild(ButtonWidget.builder(this.derk$getSnapAimText(), button -> {
 			this.snapAimToChest = !this.snapAimToChest;
 			button.setMessage(this.derk$getSnapAimText());
-		}).dimensions(fieldX, startY + rowHeight * 6, 96, 20).build());
+		}).dimensions(fieldX, startY + rowHeight * 7, 96, 20).build());
+
+		this.smokeTrailButton = this.addDrawableChild(ButtonWidget.builder(this.derk$getSmokeTrailText(), button -> {
+			this.showSmokeTrail = !this.showSmokeTrail;
+			button.setMessage(this.derk$getSmokeTrailText());
+		}).dimensions(fieldX, startY + rowHeight * 8, 96, 20).build());
+
+		this.trailParticleButton = this.addDrawableChild(ButtonWidget.builder(this.derk$getTrailParticleText(), button -> {
+			this.locateTrailParticle = this.locateTrailParticle.next();
+			button.setMessage(this.derk$getTrailParticleText());
+		}).dimensions(fieldX, startY + rowHeight * 9, 132, 20).build());
 
 		this.panelDefaultButton = this.addDrawableChild(ButtonWidget.builder(this.derk$getPanelDefaultText(), button -> {
 			this.nearbyPanelOpenByDefault = !this.nearbyPanelOpenByDefault;
 			button.setMessage(this.derk$getPanelDefaultText());
-		}).dimensions(fieldX, startY + rowHeight * 7, 96, 20).build());
+		}).dimensions(fieldX, startY + rowHeight * 10, 96, 20).build());
 
 		this.addDrawableChild(ButtonWidget.builder(Text.of("Reset Defaults"), button -> this.derk$resetToDefaults())
 				.dimensions(centerX - 155, this.height - 52, 100, 20)
@@ -114,7 +145,7 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 		int panelX = centerX - 190;
 		int panelY = 34;
 		int panelWidth = 380;
-		int panelHeight = 326;
+		int panelHeight = 430;
 		int labelX = panelX + 18;
 		int fieldX = centerX + 56;
 		int startY = 62;
@@ -133,9 +164,12 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 2, "Search radius around the crafting table.");
 		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 3, "Opacity of the filled highlight overlay.");
 		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 4, "How often the nearby list refreshes while open.");
-		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 5, "Show the floating distance text above highlights.");
-		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 6, "Rotate the camera toward the nearest matching chest on click.");
-		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 7, "Whether the nearby panel starts opened.");
+		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 5, "Turn world chest highlighting on or off without breaking locate targeting.");
+		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 6, "Show the floating distance text above highlights.");
+		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 7, "Rotate the camera toward the nearest matching chest on click.");
+		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 8, "Show a smooth trail to the located chest while keeping snap aim optional.");
+		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 9, "Choose the particle used for the locate trail effect.");
+		this.derk$drawRowDescription(context, labelX, startY + rowHeight * 10, "Whether the nearby panel starts opened.");
 		this.derk$drawColorPreview(context, fieldX + 172, startY + 2);
 	}
 
@@ -174,6 +208,10 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 		context.fill(x + width - 1, y, x + width, y + height, color);
 	}
 
+	private Text derk$getHighlightEnabledText() {
+		return Text.of(this.showHighlighter ? "On" : "Off");
+	}
+
 	private Text derk$getDistanceLabelText() {
 		return Text.of(this.showDistanceLabel ? "On" : "Off");
 	}
@@ -186,6 +224,14 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 		return Text.of(this.snapAimToChest ? "On" : "Off");
 	}
 
+	private Text derk$getSmokeTrailText() {
+		return Text.of(this.showSmokeTrail ? "On" : "Off");
+	}
+
+	private Text derk$getTrailParticleText() {
+		return Text.of(this.locateTrailParticle.getLabel());
+	}
+
 	private void derk$resetToDefaults() {
 		ConfigData defaults = ConfigData.defaults();
 		this.highlightColorField.setText(String.format(Locale.ROOT, "#%06X", defaults.highlightColor));
@@ -193,11 +239,17 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 		this.nearbyRadiusField.setText(Integer.toString(defaults.nearbyRadius));
 		this.highlightOpacityField.setText(Integer.toString(defaults.highlightOpacityPercent));
 		this.autoRefreshField.setText(this.derk$formatSeconds(defaults.autoRefreshTicks));
+		this.showHighlighter = defaults.showHighlighter;
 		this.showDistanceLabel = defaults.showDistanceLabel;
 		this.snapAimToChest = defaults.snapAimToChest;
+		this.showSmokeTrail = defaults.resolveLocateTrail();
+		this.locateTrailParticle = defaults.locateTrailParticle;
 		this.nearbyPanelOpenByDefault = defaults.nearbyPanelOpenByDefault;
+		this.highlightEnabledButton.setMessage(this.derk$getHighlightEnabledText());
 		this.showDistanceLabelButton.setMessage(this.derk$getDistanceLabelText());
 		this.snapAimButton.setMessage(this.derk$getSnapAimText());
+		this.smokeTrailButton.setMessage(this.derk$getSmokeTrailText());
+		this.trailParticleButton.setMessage(this.derk$getTrailParticleText());
 		this.panelDefaultButton.setMessage(this.derk$getPanelDefaultText());
 		this.errorText = Text.empty();
 	}
@@ -210,8 +262,12 @@ public class EasyInventoryCrafterConfigScreen extends Screen {
 			updated.nearbyRadius = this.derk$parseInt(this.nearbyRadiusField.getText(), 1, 64, "Nearby radius");
 			updated.highlightOpacityPercent = this.derk$parseInt(this.highlightOpacityField.getText(), 5, 100, "Highlight opacity");
 			updated.autoRefreshTicks = this.derk$parseSecondsToTicks(this.autoRefreshField.getText(), 0.25, 30.0);
+			updated.showHighlighter = this.showHighlighter;
 			updated.showDistanceLabel = this.showDistanceLabel;
 			updated.snapAimToChest = this.snapAimToChest;
+			updated.showLocateTrail = this.showSmokeTrail;
+			updated.showSmokeTrail = null;
+			updated.locateTrailParticle = this.locateTrailParticle;
 			updated.nearbyPanelOpenByDefault = this.nearbyPanelOpenByDefault;
 			EasyInventoryCrafterConfig.update(updated);
 			NearbyItemsClientState.requestUpdate();

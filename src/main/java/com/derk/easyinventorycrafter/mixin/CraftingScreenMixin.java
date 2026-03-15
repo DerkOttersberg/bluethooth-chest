@@ -229,6 +229,9 @@ public abstract class CraftingScreenMixin extends RecipeBookScreen<CraftingScree
 
 	@Unique
 	private void derk$renderClickPulse(DrawContext context, int totalEntries, int panelX, int panelY) {
+		if (!EasyInventoryCrafterConfig.isHighlightEnabled()) {
+			return;
+		}
 		if (this.derk$lastClickIndex < 0 || this.derk$lastClickIndex >= totalEntries) {
 			return;
 		}

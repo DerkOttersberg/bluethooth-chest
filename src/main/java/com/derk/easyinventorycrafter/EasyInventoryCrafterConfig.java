@@ -71,8 +71,20 @@ public final class EasyInventoryCrafterConfig {
 		return data.showDistanceLabel;
 	}
 
+	public static boolean isHighlightEnabled() {
+		return data.showHighlighter;
+	}
+
 	public static boolean isSnapAimEnabled() {
 		return data.snapAimToChest;
+	}
+
+	public static boolean isLocateTrailEnabled() {
+		return data.showLocateTrail;
+	}
+
+	public static LocateTrailParticle getLocateTrailParticle() {
+		return data.locateTrailParticle;
 	}
 
 	public static boolean isNearbyPanelOpenByDefault() {
@@ -85,6 +97,11 @@ public final class EasyInventoryCrafterConfig {
 
 	private static ConfigData sanitize(ConfigData source) {
 		ConfigData sanitized = source == null ? ConfigData.defaults() : source.copy();
+		sanitized.showLocateTrail = sanitized.resolveLocateTrail();
+		sanitized.showSmokeTrail = null;
+		if (sanitized.locateTrailParticle == null) {
+			sanitized.locateTrailParticle = LocateTrailParticle.WATER_EVAPORATION;
+		}
 		sanitized.highlightColor = clampColor(sanitized.highlightColor);
 		sanitized.highlightDurationTicks = clamp(sanitized.highlightDurationTicks, 10, 20 * 60);
 		sanitized.nearbyRadius = clamp(sanitized.nearbyRadius, 1, 64);
@@ -106,8 +123,12 @@ public final class EasyInventoryCrafterConfig {
 		public int highlightDurationTicks;
 		public int nearbyRadius;
 		public int highlightOpacityPercent;
+		public boolean showHighlighter;
 		public boolean showDistanceLabel;
 		public boolean snapAimToChest;
+		public Boolean showLocateTrail;
+		public Boolean showSmokeTrail;
+		public LocateTrailParticle locateTrailParticle;
 		public boolean nearbyPanelOpenByDefault;
 		public int autoRefreshTicks;
 
@@ -116,12 +137,26 @@ public final class EasyInventoryCrafterConfig {
 			defaults.highlightColor = 0xFFD700;
 			defaults.highlightDurationTicks = 100;
 			defaults.nearbyRadius = 16;
-			defaults.highlightOpacityPercent = 40;
+			defaults.highlightOpacityPercent = 35;
+			defaults.showHighlighter = true;
 			defaults.showDistanceLabel = true;
-			defaults.snapAimToChest = true;
+			defaults.snapAimToChest = false;
+			defaults.showLocateTrail = true;
+			defaults.showSmokeTrail = null;
+			defaults.locateTrailParticle = LocateTrailParticle.WATER_EVAPORATION;
 			defaults.nearbyPanelOpenByDefault = true;
 			defaults.autoRefreshTicks = 20;
 			return defaults;
+		}
+
+		public boolean resolveLocateTrail() {
+			if (this.showLocateTrail != null) {
+				return this.showLocateTrail;
+			}
+			if (this.showSmokeTrail != null) {
+				return this.showSmokeTrail;
+			}
+			return true;
 		}
 
 		public ConfigData copy() {
@@ -130,11 +165,36 @@ public final class EasyInventoryCrafterConfig {
 			copy.highlightDurationTicks = this.highlightDurationTicks;
 			copy.nearbyRadius = this.nearbyRadius;
 			copy.highlightOpacityPercent = this.highlightOpacityPercent;
+			copy.showHighlighter = this.showHighlighter;
 			copy.showDistanceLabel = this.showDistanceLabel;
 			copy.snapAimToChest = this.snapAimToChest;
+			copy.showLocateTrail = this.resolveLocateTrail();
+			copy.showSmokeTrail = this.showSmokeTrail;
+			copy.locateTrailParticle = this.locateTrailParticle;
 			copy.nearbyPanelOpenByDefault = this.nearbyPanelOpenByDefault;
 			copy.autoRefreshTicks = this.autoRefreshTicks;
 			return copy;
+		}
+	}
+
+	public enum LocateTrailParticle {
+		WATER_EVAPORATION("Water Evap."),
+		SMOKE("Smoke"),
+		END_ROD("End Rod");
+
+		private final String label;
+
+		LocateTrailParticle(String label) {
+			this.label = label;
+		}
+
+		public String getLabel() {
+			return this.label;
+		}
+
+		public LocateTrailParticle next() {
+			LocateTrailParticle[] values = values();
+			return values[(this.ordinal() + 1) % values.length];
 		}
 	}
 }
