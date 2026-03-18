@@ -4,6 +4,7 @@ import com.derk.easyinventorycrafter.EasyInventoryCrafterConfig;
 import com.derk.easyinventorycrafter.client.NearbyItemsClientState;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
@@ -27,6 +28,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(net.minecraft.client.renderer.LevelRenderer.class)
 public class LevelRendererMixin {
     private static final float HIGHLIGHT_FACE_OFFSET = 0.003f;
+    private static final float DISTANCE_LABEL_HEIGHT = 1.02f;
 
     @Inject(
         method = "renderBlockOutline(Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lcom/mojang/blaze3d/vertex/PoseStack;ZLnet/minecraft/client/renderer/state/LevelRenderState;)V",
@@ -284,10 +286,13 @@ public class LevelRendererMixin {
         int textAlpha = Math.max(64, Math.min(255, (int) (alpha * 255.0f)));
         int textColor = ARGB.color(textAlpha, 255, 255, 255);
         int outlineColor = ARGB.color(textAlpha, 0, 0, 0);
+        double labelX = pos.getX() + 0.5;
+        double labelZ = pos.getZ() + 0.5;
+        float yawDegrees = (float) Math.toDegrees(Math.atan2(eyePos.x - labelX, eyePos.z - labelZ));
 
         poseStack.pushPose();
-        poseStack.translate(dx + 0.5, dy + 1.15, dz + 0.5);
-        poseStack.mulPose(renderState.cameraRenderState.orientation);
+        poseStack.translate(dx + 0.5, dy + DISTANCE_LABEL_HEIGHT, dz + 0.5);
+        poseStack.mulPose(Axis.YP.rotationDegrees(yawDegrees));
         poseStack.scale(-0.025f, -0.025f, 0.025f);
         Matrix4f matrix = poseStack.last().pose();
         font.drawInBatch8xOutline(Component.literal(text).getVisualOrderText(), textX, 0.0f, textColor, outlineColor, matrix, bufferSource, 15728880);
