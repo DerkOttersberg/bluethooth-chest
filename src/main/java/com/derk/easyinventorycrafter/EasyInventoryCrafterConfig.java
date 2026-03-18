@@ -144,7 +144,7 @@ public final class EasyInventoryCrafterConfig {
             defaults.highlightDurationTicks = 100;
             defaults.nearbyRadius = 16;
             defaults.highlightOpacityPercent = 35;
-            defaults.nearbyPanelOpacityPercent = 75;
+            defaults.nearbyPanelOpacityPercent = 40;
             defaults.showHighlighter = true;
             defaults.showDistanceLabel = true;
             defaults.snapAimToChest = false;
