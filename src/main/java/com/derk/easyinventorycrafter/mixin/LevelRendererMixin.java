@@ -5,8 +5,10 @@ import com.derk.easyinventorycrafter.client.NearbyItemsClientState;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -16,6 +18,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ARGB;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -103,7 +107,11 @@ public class LevelRendererMixin {
         bufferSource.endBatch(RenderTypes.debugQuads());
 
         if (EasyInventoryCrafterConfig.isDistanceLabelEnabled() && mc.player != null) {
+            Set<BlockPos> labeledPositions = new HashSet<>();
             for (BlockPos pos : positions) {
+                if (!labeledPositions.add(pos.immutable())) {
+                    continue;
+                }
                 if (mc.level.isOutsideBuildHeight(pos)) {
                     continue;
                 }
@@ -112,10 +120,23 @@ public class LevelRendererMixin {
                     continue;
                 }
 
-                double dx = pos.getX() - camPos.x;
-                double dy = pos.getY() - camPos.y;
-                double dz = pos.getZ() - camPos.z;
-                derk$renderDistanceLabel(mc, bufferSource, poseStack, renderState, pos, dx, dy, dz, alpha);
+                Vec3 labelAnchor = new Vec3(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+                if (state.getBlock() instanceof ChestBlock && state.getValue(ChestBlock.TYPE) != ChestType.SINGLE) {
+                    BlockPos connectedPos = ChestBlock.getConnectedBlockPos(pos, state);
+                    if (positions.contains(connectedPos) && mc.level.isLoaded(connectedPos)) {
+                        labeledPositions.add(connectedPos.immutable());
+                        labelAnchor = new Vec3(
+                            (pos.getX() + connectedPos.getX()) / 2.0 + 0.5,
+                            Math.max(pos.getY(), connectedPos.getY()),
+                            (pos.getZ() + connectedPos.getZ()) / 2.0 + 0.5
+                        );
+                    }
+                }
+
+                double dx = labelAnchor.x - camPos.x;
+                double dy = labelAnchor.y - camPos.y;
+                double dz = labelAnchor.z - camPos.z;
+                derk$renderDistanceLabel(mc, bufferSource, poseStack, renderState, labelAnchor, dx, dy, dz, alpha);
             }
         }
     }
@@ -272,26 +293,26 @@ public class LevelRendererMixin {
         MultiBufferSource.BufferSource bufferSource,
         PoseStack poseStack,
         LevelRenderState renderState,
-        BlockPos pos,
+        Vec3 labelAnchor,
         double dx,
         double dy,
         double dz,
         float alpha
     ) {
         Vec3 eyePos = mc.player.getEyePosition();
-        double meters = Math.sqrt(eyePos.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5));
+        double meters = Math.sqrt(eyePos.distanceToSqr(labelAnchor));
         String text = String.format(Locale.ROOT, "%.1fm", meters);
         Font font = mc.font;
         float textX = -font.width(text) / 2.0f;
         int textAlpha = Math.max(64, Math.min(255, (int) (alpha * 255.0f)));
         int textColor = ARGB.color(textAlpha, 255, 255, 255);
         int backgroundColor = ARGB.color(Math.max(48, textAlpha / 2), 0, 0, 0);
-        double labelX = pos.getX() + 0.5;
-        double labelZ = pos.getZ() + 0.5;
+        double labelX = labelAnchor.x;
+        double labelZ = labelAnchor.z;
         float yawDegrees = (float) Math.toDegrees(Math.atan2(eyePos.x - labelX, eyePos.z - labelZ)) + 180.0f;
 
         poseStack.pushPose();
-        poseStack.translate(dx + 0.5, dy + DISTANCE_LABEL_HEIGHT, dz + 0.5);
+        poseStack.translate(dx, dy + DISTANCE_LABEL_HEIGHT, dz);
         poseStack.mulPose(Axis.YP.rotationDegrees(yawDegrees));
         poseStack.scale(-0.025f, -0.025f, 0.025f);
         Matrix4f matrix = poseStack.last().pose();
