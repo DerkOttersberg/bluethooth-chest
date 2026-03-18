@@ -1,72 +1,58 @@
 package com.derk.easyinventorycrafter.net;
 
-import com.derk.easyinventorycrafter.EasyInventoryCrafterMod;
 import com.derk.easyinventorycrafter.NearbyCraftingAccess;
 import com.derk.easyinventorycrafter.client.NearbyItemsClientState;
 import java.util.List;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.InventoryMenu;
-import net.minecraftforge.event.network.CustomPayloadEvent;
-import net.minecraftforge.network.ChannelBuilder;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.network.SimpleChannel;
-import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class EasyInventoryCrafterNetwork {
-    private static final SimpleChannel CHANNEL = ChannelBuilder
-        .named(EasyInventoryCrafterMod.MOD_ID + ":main")
-        .networkProtocolVersion(1)
-        .simpleChannel();
+    private static final String PROTOCOL_VERSION = "1";
 
     private EasyInventoryCrafterNetwork() {
     }
 
-    public static void init() {
-        CHANNEL.messageBuilder(RequestNearbyItemsPacket.class, 0)
-            .encoder(RequestNearbyItemsPacket::encode)
-            .decoder(RequestNearbyItemsPacket::decode)
-            .consumerMainThread(EasyInventoryCrafterNetwork::handleRequestNearbyItems)
-            .add();
-
-        CHANNEL.messageBuilder(NearbyItemsPacket.class, 1)
-            .encoder((packet, buf) -> NearbyItemsPacket.encode(packet, (RegistryFriendlyByteBuf) buf))
-            .decoder(buf -> NearbyItemsPacket.decode((RegistryFriendlyByteBuf) buf))
-            .consumerMainThread(EasyInventoryCrafterNetwork::handleNearbyItems)
-            .add();
-
-        CHANNEL.messageBuilder(NearbyHighlightRequestPacket.class, 2)
-            .encoder((packet, buf) -> NearbyHighlightRequestPacket.encode(packet, (RegistryFriendlyByteBuf) buf))
-            .decoder(buf -> NearbyHighlightRequestPacket.decode((RegistryFriendlyByteBuf) buf))
-            .consumerMainThread(EasyInventoryCrafterNetwork::handleHighlightRequest)
-            .add();
-
-        CHANNEL.messageBuilder(NearbyHighlightResponsePacket.class, 3)
-            .encoder(NearbyHighlightResponsePacket::encode)
-            .decoder(NearbyHighlightResponsePacket::decode)
-            .consumerMainThread(EasyInventoryCrafterNetwork::handleHighlightResponse)
-            .add();
-
-        CHANNEL.messageBuilder(ReturnNearbyItemsPacket.class, 4)
-            .encoder(ReturnNearbyItemsPacket::encode)
-            .decoder(ReturnNearbyItemsPacket::decode)
-            .consumerMainThread(EasyInventoryCrafterNetwork::handleReturnNearbyItems)
-            .add();
-
-        CHANNEL.build();
+    public static void init(IEventBus modBus) {
+        modBus.addListener(EasyInventoryCrafterNetwork::registerPayloadHandlers);
     }
 
-    public static void sendToPlayer(ServerPlayer player, Object packet) {
-        CHANNEL.send(packet, PacketDistributor.PLAYER.with(player));
+    public static void initClient(IEventBus modBus) {
+        modBus.addListener(EasyInventoryCrafterNetwork::registerClientPayloadHandlers);
     }
 
-    public static void sendToServer(Object packet) {
-        CHANNEL.send(packet, PacketDistributor.SERVER.noArg());
+    private static void registerPayloadHandlers(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
+        registrar.playToServer(RequestNearbyItemsPacket.TYPE, RequestNearbyItemsPacket.STREAM_CODEC, EasyInventoryCrafterNetwork::handleRequestNearbyItems);
+        registrar.playToClient(NearbyItemsPacket.TYPE, NearbyItemsPacket.STREAM_CODEC);
+        registrar.playToServer(NearbyHighlightRequestPacket.TYPE, NearbyHighlightRequestPacket.STREAM_CODEC, EasyInventoryCrafterNetwork::handleHighlightRequest);
+        registrar.playToClient(NearbyHighlightResponsePacket.TYPE, NearbyHighlightResponsePacket.STREAM_CODEC);
+        registrar.playToServer(ReturnNearbyItemsPacket.TYPE, ReturnNearbyItemsPacket.STREAM_CODEC, EasyInventoryCrafterNetwork::handleReturnNearbyItems);
     }
 
-    private static void handleRequestNearbyItems(RequestNearbyItemsPacket packet, CustomPayloadEvent.Context context) {
-        ServerPlayer player = context.getSender();
-        if (player == null) {
+    private static void registerClientPayloadHandlers(RegisterClientPayloadHandlersEvent event) {
+        event.register(NearbyItemsPacket.TYPE, EasyInventoryCrafterNetwork::handleNearbyItems);
+        event.register(NearbyHighlightResponsePacket.TYPE, EasyInventoryCrafterNetwork::handleHighlightResponse);
+    }
+
+    public static void sendToPlayer(ServerPlayer player, net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
+        PacketDistributor.sendToPlayer(player, packet);
+    }
+
+    public static void sendToServer(net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
+        ClientPacketDistributor.sendToServer(packet);
+    }
+
+    private static void handleRequestNearbyItems(RequestNearbyItemsPacket packet, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }
 
@@ -75,9 +61,8 @@ public final class EasyInventoryCrafterNetwork {
         }
     }
 
-    private static void handleHighlightRequest(NearbyHighlightRequestPacket packet, CustomPayloadEvent.Context context) {
-        ServerPlayer player = context.getSender();
-        if (player == null) {
+    private static void handleHighlightRequest(NearbyHighlightRequestPacket packet, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }
 
@@ -91,9 +76,8 @@ public final class EasyInventoryCrafterNetwork {
         }
     }
 
-    private static void handleReturnNearbyItems(ReturnNearbyItemsPacket packet, CustomPayloadEvent.Context context) {
-        ServerPlayer player = context.getSender();
-        if (player == null) {
+    private static void handleReturnNearbyItems(ReturnNearbyItemsPacket packet, IPayloadContext context) {
+        if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }
 
@@ -102,11 +86,11 @@ public final class EasyInventoryCrafterNetwork {
         }
     }
 
-    private static void handleNearbyItems(NearbyItemsPacket packet, CustomPayloadEvent.Context context) {
+    private static void handleNearbyItems(NearbyItemsPacket packet, IPayloadContext context) {
         NearbyItemsClientState.applyPayload(packet);
     }
 
-    private static void handleHighlightResponse(NearbyHighlightResponsePacket packet, CustomPayloadEvent.Context context) {
+    private static void handleHighlightResponse(NearbyHighlightResponsePacket packet, IPayloadContext context) {
         NearbyItemsClientState.setHighlight(packet.positions(), com.derk.easyinventorycrafter.EasyInventoryCrafterConfig.getHighlightDurationTicks());
     }
 }

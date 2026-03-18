@@ -1,5 +1,6 @@
 package com.derk.easyinventorycrafter.mixin;
 
+import com.derk.easyinventorycrafter.client.NearbyRecipeBookComponentAccess;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
@@ -15,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(RecipeBookComponent.class)
-public abstract class RecipeBookComponentMixin {
+public abstract class RecipeBookComponentMixin implements NearbyRecipeBookComponentAccess {
     @Shadow
     @Nullable
     private RecipeCollection lastRecipeCollection;
@@ -27,6 +28,9 @@ public abstract class RecipeBookComponentMixin {
     @Invoker("tryPlaceRecipe")
     protected abstract boolean derk$invokeTryPlaceRecipe(RecipeCollection collection, RecipeDisplayId recipeId, boolean shiftDown);
 
+    @Invoker("updateStackedContents")
+    protected abstract void derk$invokeUpdateStackedContents();
+
     @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
     private void derk$spacebarAddsOneSet(KeyEvent input, CallbackInfoReturnable<Boolean> cir) {
         if (input.key() != 32) {
@@ -37,5 +41,10 @@ public abstract class RecipeBookComponentMixin {
         }
         AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
         cir.setReturnValue(derk$invokeTryPlaceRecipe(lastRecipeCollection, lastRecipe, false));
+    }
+
+    @Override
+    public void derk$refreshStackedContents() {
+        derk$invokeUpdateStackedContents();
     }
 }

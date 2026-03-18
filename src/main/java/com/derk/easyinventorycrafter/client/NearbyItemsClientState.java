@@ -64,11 +64,14 @@ public final class NearbyItemsClientState {
     }
 
     public static void applyPayload(NearbyItemsPacket payload) {
-        entries = payload.entries();
-        recipeFinderStacks = payload.recipeFinderStacks();
         Minecraft client = Minecraft.getInstance();
         client.execute(() -> {
+            entries = List.copyOf(payload.entries());
+            recipeFinderStacks = List.copyOf(payload.recipeFinderStacks());
             if (client.screen instanceof RecipeUpdateListener listener) {
+                if (client.screen instanceof NearbyRecipeBookRefreshAccess access) {
+                    access.derk$refreshNearbyRecipeBook();
+                }
                 listener.recipesUpdated();
             }
         });
