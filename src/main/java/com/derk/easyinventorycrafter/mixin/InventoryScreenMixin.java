@@ -4,6 +4,8 @@ import com.derk.easyinventorycrafter.EasyInventoryCrafterConfig;
 import com.derk.easyinventorycrafter.NearbyInventoryScanner.NearbyItemEntry;
 import com.derk.easyinventorycrafter.client.NearbyItemsClientState;
 import com.derk.easyinventorycrafter.client.NearbyPanelAccess;
+import com.derk.easyinventorycrafter.client.NearbyRecipeBookComponentAccess;
+import com.derk.easyinventorycrafter.client.NearbyRecipeBookRefreshAccess;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -12,12 +14,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractRecipeBookScreen;
+import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
-import net.minecraft.client.gui.screens.recipebook.CraftingRecipeBookComponent;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -27,13 +26,18 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(InventoryScreen.class)
-public abstract class InventoryScreenMixin extends AbstractRecipeBookScreen<InventoryMenu> implements NearbyPanelAccess {
+public abstract class InventoryScreenMixin extends EffectRenderingInventoryScreen<InventoryMenu> implements NearbyPanelAccess, NearbyRecipeBookRefreshAccess {
+    @Shadow
+    private RecipeBookComponent recipeBookComponent;
+
     @Unique
     private Button derk$nearbyButton;
 
@@ -47,7 +51,12 @@ public abstract class InventoryScreenMixin extends AbstractRecipeBookScreen<Inve
     private boolean derk$nearbyOpen = true;
 
     protected InventoryScreenMixin(InventoryMenu menu, Inventory inventory, Component title) {
-        super(menu, new CraftingRecipeBookComponent(menu), inventory, title);
+        super(menu, inventory, title);
+    }
+
+    @Override
+    public void derk$refreshNearbyRecipeBook() {
+        ((NearbyRecipeBookComponentAccess) recipeBookComponent).derk$refreshStackedContents();
     }
 
     @Inject(method = "init", at = @At("TAIL"))
@@ -141,6 +150,20 @@ public abstract class InventoryScreenMixin extends AbstractRecipeBookScreen<Inve
         }
     }
 
+    @Inject(method = "charTyped", at = @At("HEAD"), cancellable = true)
+    private void derk$onCharTyped(char chr, int modifiers, CallbackInfoReturnable<Boolean> cir) {
+        if (derk$handleCharTyped(chr, modifiers)) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
+    private void derk$onKeyPressed(int keyCode, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> cir) {
+        if (derk$handleKeyPressed(keyCode, scanCode, modifiers)) {
+            cir.setReturnValue(true);
+        }
+    }
+
     @Unique
     private static int derk$withPanelOpacity(int color) {
         int alpha = (color >>> 24) & 0xFF;
@@ -149,13 +172,11 @@ public abstract class InventoryScreenMixin extends AbstractRecipeBookScreen<Inve
     }
 
     @Override
-    public boolean derk$handleMouseClick(MouseButtonEvent click, boolean doubleClick) {
-        if (!derk$nearbyOpen || click.button() != 0) {
+    public boolean derk$handleMouseClick(double mouseX, double mouseY, int button) {
+        if (!derk$nearbyOpen || button != 0) {
             return false;
         }
 
-        double mouseX = click.x();
-        double mouseY = click.y();
         int panelX = this.leftPos + this.imageWidth + 6;
         int panelY = this.topPos + 48;
         int columns = 4;
@@ -209,11 +230,11 @@ public abstract class InventoryScreenMixin extends AbstractRecipeBookScreen<Inve
     }
 
     @Override
-    public boolean derk$handleCharTyped(CharacterEvent input) {
+    public boolean derk$handleCharTyped(char chr, int modifiers) {
         if (!derk$nearbyOpen) {
             return false;
         }
-        if (derk$searchField != null && derk$searchField.charTyped(input)) {
+        if (derk$searchField != null && derk$searchField.charTyped(chr, modifiers)) {
             derk$scrollOffset = 0;
             return true;
         }
@@ -221,11 +242,11 @@ public abstract class InventoryScreenMixin extends AbstractRecipeBookScreen<Inve
     }
 
     @Override
-    public boolean derk$handleKeyPressed(KeyEvent input) {
+    public boolean derk$handleKeyPressed(int keyCode, int scanCode, int modifiers) {
         if (!derk$nearbyOpen) {
             return false;
         }
-        if (derk$searchField != null && derk$searchField.keyPressed(input)) {
+        if (derk$searchField != null && derk$searchField.keyPressed(keyCode, scanCode, modifiers)) {
             derk$scrollOffset = 0;
             return true;
         }

@@ -13,10 +13,8 @@
   "client": [
     "AbstractContainerScreenMixin",
     "AbstractCraftingMenuClientMixin",
-    "AbstractRecipeBookScreenMixin",
     "CraftingScreenMixin",
     "InventoryScreenMixin",
-    "LevelRendererMixin",
     "RecipeBookComponentMixin"
   ],
   "injectors": {

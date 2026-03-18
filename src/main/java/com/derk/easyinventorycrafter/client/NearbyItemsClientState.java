@@ -71,6 +71,8 @@ public final class NearbyItemsClientState {
             if (client.screen instanceof RecipeUpdateListener listener) {
                 if (client.screen instanceof NearbyRecipeBookRefreshAccess access) {
                     access.derk$refreshNearbyRecipeBook();
+                } else {
+                    ((NearbyRecipeBookComponentAccess) listener.getRecipeBookComponent()).derk$refreshStackedContents();
                 }
                 listener.recipesUpdated();
             }

@@ -6,21 +6,24 @@ import java.lang.reflect.Field;
 import java.util.List;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.player.StackedItemContents;
-import net.minecraft.world.inventory.AbstractCraftingMenu;
+import net.minecraft.world.entity.player.StackedContents;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.RecipeBookMenu;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(AbstractCraftingMenu.class)
+@Mixin(targets = {
+    "net.minecraft.world.inventory.CraftingMenu",
+    "net.minecraft.world.inventory.InventoryMenu"
+})
 public class AbstractCraftingMenuMixin {
     @Inject(method = "fillCraftSlotsStackedContents", at = @At("TAIL"))
-    private void derk$addNearbyItems(StackedItemContents contents, CallbackInfo ci) {
-        AbstractCraftingMenu menu = (AbstractCraftingMenu) (Object) this;
+    private void derk$addNearbyItems(StackedContents contents, CallbackInfo ci) {
+        RecipeBookMenu<?, ?> menu = (RecipeBookMenu<?, ?>) (Object) this;
         NearbyInventoryScanner.WorldPos worldPos = null;
 
         if (menu instanceof NearbyCraftingAccess access) {

@@ -3,11 +3,11 @@ package com.derk.easyinventorycrafter.net;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 public record NearbyHighlightRequestPacket(ItemStack stack) implements CustomPacketPayload {
-    public static final Type<NearbyHighlightRequestPacket> TYPE = new Type<>(Identifier.fromNamespaceAndPath("derk_easy_inventory_crafter", "nearby_highlight_request"));
+    public static final Type<NearbyHighlightRequestPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("derk_easy_inventory_crafter", "nearby_highlight_request"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NearbyHighlightRequestPacket> STREAM_CODEC = StreamCodec.of((buf, packet) -> packet.write(buf), NearbyHighlightRequestPacket::decode);
 
     public static NearbyHighlightRequestPacket decode(RegistryFriendlyByteBuf buf) {

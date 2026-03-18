@@ -4,6 +4,8 @@ import com.derk.easyinventorycrafter.EasyInventoryCrafterConfig;
 import com.derk.easyinventorycrafter.NearbyInventoryScanner.NearbyItemEntry;
 import com.derk.easyinventorycrafter.client.NearbyItemsClientState;
 import com.derk.easyinventorycrafter.client.NearbyPanelAccess;
+import com.derk.easyinventorycrafter.client.NearbyRecipeBookComponentAccess;
+import com.derk.easyinventorycrafter.client.NearbyRecipeBookRefreshAccess;
 import com.derk.easyinventorycrafter.net.EasyInventoryCrafterNetwork;
 import com.derk.easyinventorycrafter.net.ReturnNearbyItemsPacket;
 import java.util.ArrayList;
@@ -15,12 +17,9 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.gui.screens.inventory.AbstractRecipeBookScreen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CraftingScreen;
-import net.minecraft.client.gui.screens.recipebook.CraftingRecipeBookComponent;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -31,13 +30,18 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(CraftingScreen.class)
-public abstract class CraftingScreenMixin extends AbstractRecipeBookScreen<CraftingMenu> implements NearbyPanelAccess {
+public abstract class CraftingScreenMixin extends AbstractContainerScreen<CraftingMenu> implements NearbyPanelAccess, NearbyRecipeBookRefreshAccess {
+    @Shadow
+    private RecipeBookComponent recipeBookComponent;
+
     @Unique
     private Button derk$nearbyButton;
 
@@ -60,7 +64,12 @@ public abstract class CraftingScreenMixin extends AbstractRecipeBookScreen<Craft
     private long derk$lastClickTick = -1000L;
 
     protected CraftingScreenMixin(CraftingMenu menu, Inventory inventory, Component title) {
-        super(menu, new CraftingRecipeBookComponent(menu), inventory, title);
+        super(menu, inventory, title);
+    }
+
+    @Override
+    public void derk$refreshNearbyRecipeBook() {
+        ((NearbyRecipeBookComponentAccess) recipeBookComponent).derk$refreshStackedContents();
     }
 
     @Inject(method = "init", at = @At("TAIL"))
@@ -165,6 +174,20 @@ public abstract class CraftingScreenMixin extends AbstractRecipeBookScreen<Craft
         derk$renderClickPulse(guiGraphics, entries.size(), panelX, panelY);
     }
 
+    @Inject(method = "charTyped", at = @At("HEAD"), cancellable = true)
+    private void derk$onCharTyped(char chr, int modifiers, CallbackInfoReturnable<Boolean> cir) {
+        if (derk$handleCharTyped(chr, modifiers)) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
+    private void derk$onKeyPressed(int keyCode, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> cir) {
+        if (derk$handleKeyPressed(keyCode, scanCode, modifiers)) {
+            cir.setReturnValue(true);
+        }
+    }
+
     @Unique
     private static int derk$withPanelOpacity(int color) {
         int alpha = (color >>> 24) & 0xFF;
@@ -173,13 +196,11 @@ public abstract class CraftingScreenMixin extends AbstractRecipeBookScreen<Craft
     }
 
     @Override
-    public boolean derk$handleMouseClick(MouseButtonEvent click, boolean doubleClick) {
-        if (!derk$nearbyOpen || click.button() != 0) {
+    public boolean derk$handleMouseClick(double mouseX, double mouseY, int button) {
+        if (!derk$nearbyOpen || button != 0) {
             return false;
         }
 
-        double mouseX = click.x();
-        double mouseY = click.y();
         int panelX = this.leftPos + this.imageWidth + 6;
         int panelY = this.topPos + 48;
         int columns = 4;
@@ -234,11 +255,11 @@ public abstract class CraftingScreenMixin extends AbstractRecipeBookScreen<Craft
     }
 
     @Override
-    public boolean derk$handleCharTyped(CharacterEvent input) {
+    public boolean derk$handleCharTyped(char chr, int modifiers) {
         if (!derk$nearbyOpen) {
             return false;
         }
-        if (derk$searchField != null && derk$searchField.charTyped(input)) {
+        if (derk$searchField != null && derk$searchField.charTyped(chr, modifiers)) {
             derk$scrollOffset = 0;
             return true;
         }
@@ -246,11 +267,11 @@ public abstract class CraftingScreenMixin extends AbstractRecipeBookScreen<Craft
     }
 
     @Override
-    public boolean derk$handleKeyPressed(KeyEvent input) {
+    public boolean derk$handleKeyPressed(int keyCode, int scanCode, int modifiers) {
         if (!derk$nearbyOpen) {
             return false;
         }
-        if (derk$searchField != null && derk$searchField.keyPressed(input)) {
+        if (derk$searchField != null && derk$searchField.keyPressed(keyCode, scanCode, modifiers)) {
             derk$scrollOffset = 0;
             return true;
         }

@@ -4,15 +4,13 @@ import com.derk.easyinventorycrafter.NearbyCraftingAccess;
 import com.derk.easyinventorycrafter.NearbyInventoryScanner;
 import java.lang.reflect.Field;
 import java.util.List;
-import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractCraftingMenu;
-import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.RecipeBookMenu;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.recipebook.ServerPlaceRecipe;
 import org.jetbrains.annotations.Nullable;
@@ -32,18 +30,18 @@ public abstract class ServerPlaceRecipeMixin<R extends net.minecraft.world.item.
 
     @Shadow
     @Final
-    private ServerPlaceRecipe.CraftingMenuAccess<R> menu;
+    private RecipeBookMenu<?, R> menu;
 
     @Inject(method = "moveItemToGrid", at = @At("HEAD"), cancellable = true)
-    private void derk$fillFromNearby(Slot slot, Holder<Item> item, int remaining, CallbackInfoReturnable<Integer> cir) {
+    private void derk$fillFromNearby(Slot slot, ItemStack requestedStack, int remaining, CallbackInfoReturnable<Integer> cir) {
         int targetCount = remaining;
         ItemStack slotStack = slot.getItem();
-        int availableInPlayer = derk$countInPlayerInventory(item, slotStack);
+        int availableInPlayer = derk$countInPlayerInventory(requestedStack, slotStack);
         if (availableInPlayer >= targetCount) {
             return;
         }
 
-        AbstractCraftingMenu screenMenu = derk$resolveMenu();
+        RecipeBookMenu<?, ?> screenMenu = derk$resolveMenu();
         if (screenMenu == null) {
             return;
         }
@@ -59,13 +57,13 @@ public abstract class ServerPlaceRecipeMixin<R extends net.minecraft.world.item.
             NearbyInventoryScanner.getConfiguredRadius()
         );
 
-        int availableInNearby = derk$countInInventories(inventories, item, slotStack);
+        int availableInNearby = derk$countInInventories(inventories, requestedStack, slotStack);
         if (availableInPlayer + availableInNearby < targetCount) {
             return;
         }
 
         int stillNeeded = targetCount;
-        stillNeeded = derk$takeFromPlayerInventory(item, slotStack, slot, stillNeeded);
+        stillNeeded = derk$takeFromPlayerInventory(requestedStack, slotStack, slot, stillNeeded);
         slotStack = slot.getItem();
         if (stillNeeded <= 0) {
             cir.setReturnValue(0);
@@ -78,7 +76,7 @@ public abstract class ServerPlaceRecipeMixin<R extends net.minecraft.world.item.
                 if (stack.isEmpty()) {
                     continue;
                 }
-                if (!stack.is(item) || !Inventory.isUsableForCrafting(stack)) {
+                if (stack.getItem() != requestedStack.getItem() || !derk$isUsableForCrafting(stack)) {
                     continue;
                 }
                 if (!slotStack.isEmpty() && !ItemStack.isSameItemSameComponents(slotStack, stack)) {
@@ -118,14 +116,14 @@ public abstract class ServerPlaceRecipeMixin<R extends net.minecraft.world.item.
 
     @Inject(method = "clearGrid", at = @At("HEAD"))
     private void derk$returnNearbyInputsToOrigin(CallbackInfo ci) {
-        AbstractCraftingMenu screenMenu = derk$resolveMenu();
+        RecipeBookMenu<?, ?> screenMenu = derk$resolveMenu();
         if (screenMenu instanceof NearbyCraftingAccess access) {
             access.derk$prepareNearbyWithdrawalsForAutofill();
         }
     }
 
     @Nullable
-    private NearbyInventoryScanner.WorldPos derk$getWorldPos(AbstractCraftingMenu menu) {
+    private NearbyInventoryScanner.WorldPos derk$getWorldPos(RecipeBookMenu<?, ?> menu) {
         if (menu instanceof NearbyCraftingAccess access) {
             return access.derk$getAccess().evaluate((level, pos) -> new NearbyInventoryScanner.WorldPos(level, pos)).orElse(null);
         }
@@ -140,7 +138,7 @@ public abstract class ServerPlaceRecipeMixin<R extends net.minecraft.world.item.
         return null;
     }
 
-    private int derk$countInInventories(List<Container> inventories, Holder<Item> item, ItemStack slotStack) {
+    private int derk$countInInventories(List<Container> inventories, ItemStack requestedStack, ItemStack slotStack) {
         int total = 0;
         for (Container inv : inventories) {
             for (int i = 0; i < inv.getContainerSize(); i++) {
@@ -148,7 +146,7 @@ public abstract class ServerPlaceRecipeMixin<R extends net.minecraft.world.item.
                 if (stack.isEmpty()) {
                     continue;
                 }
-                if (!stack.is(item) || !Inventory.isUsableForCrafting(stack)) {
+                if (stack.getItem() != requestedStack.getItem() || !derk$isUsableForCrafting(stack)) {
                     continue;
                 }
                 if (!slotStack.isEmpty() && !ItemStack.isSameItemSameComponents(slotStack, stack)) {
@@ -163,13 +161,17 @@ public abstract class ServerPlaceRecipeMixin<R extends net.minecraft.world.item.
         return total;
     }
 
-    private int derk$countInPlayerInventory(Holder<Item> item, ItemStack slotStack) {
+    private int derk$countInPlayerInventory(ItemStack requestedStack, ItemStack slotStack) {
         int total = 0;
-        for (ItemStack stack : inventory.getNonEquipmentItems()) {
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            if (!derk$isPlayerCraftingSlot(i)) {
+                continue;
+            }
+            ItemStack stack = inventory.getItem(i);
             if (stack.isEmpty()) {
                 continue;
             }
-            if (!stack.is(item) || !Inventory.isUsableForCrafting(stack)) {
+            if (stack.getItem() != requestedStack.getItem() || !derk$isUsableForCrafting(stack)) {
                 continue;
             }
             if (!slotStack.isEmpty() && !ItemStack.isSameItemSameComponents(slotStack, stack)) {
@@ -180,14 +182,17 @@ public abstract class ServerPlaceRecipeMixin<R extends net.minecraft.world.item.
         return total;
     }
 
-    private int derk$takeFromPlayerInventory(Holder<Item> item, ItemStack slotStack, Slot slot, int remaining) {
+    private int derk$takeFromPlayerInventory(ItemStack requestedStack, ItemStack slotStack, Slot slot, int remaining) {
         int stillNeeded = remaining;
-        for (int i = 0; i < inventory.getNonEquipmentItems().size() && stillNeeded > 0; i++) {
+        for (int i = 0; i < inventory.getContainerSize() && stillNeeded > 0; i++) {
+            if (!derk$isPlayerCraftingSlot(i)) {
+                continue;
+            }
             ItemStack stack = inventory.getItem(i);
             if (stack.isEmpty()) {
                 continue;
             }
-            if (!stack.is(item) || !Inventory.isUsableForCrafting(stack)) {
+            if (stack.getItem() != requestedStack.getItem() || !derk$isUsableForCrafting(stack)) {
                 continue;
             }
             if (!slotStack.isEmpty() && !ItemStack.isSameItemSameComponents(slotStack, stack)) {
@@ -214,34 +219,47 @@ public abstract class ServerPlaceRecipeMixin<R extends net.minecraft.world.item.
     }
 
     @Nullable
-    private AbstractCraftingMenu derk$resolveMenu() {
+    private RecipeBookMenu<?, ?> derk$resolveMenu() {
         Object menuObj = menu;
         if (menuObj == null) {
             return null;
         }
 
         for (Field field : menuObj.getClass().getDeclaredFields()) {
-            if (AbstractCraftingMenu.class.isAssignableFrom(field.getType())) {
+            if (RecipeBookMenu.class.isAssignableFrom(field.getType())) {
                 field.setAccessible(true);
                 try {
-                    return (AbstractCraftingMenu) field.get(menuObj);
+                    return (RecipeBookMenu<?, ?>) field.get(menuObj);
                 } catch (IllegalAccessException ignored) {
                     return null;
                 }
             }
         }
 
-        return null;
+        return menu;
     }
 
-    private int derk$getCraftingSlotIndex(AbstractCraftingMenu menu, Slot slot) {
-        List<Slot> inputSlots = menu.getInputGridSlots();
-        for (int i = 0; i < inputSlots.size(); i++) {
-            if (inputSlots.get(i) == slot) {
+    private int derk$getCraftingSlotIndex(RecipeBookMenu<?, ?> menu, Slot slot) {
+        int resultSlotIndex = menu.getResultSlotIndex();
+        int gridSize = menu.getGridWidth() * menu.getGridHeight();
+        for (int i = 0; i < gridSize; i++) {
+            int slotIndex = resultSlotIndex + 1 + i;
+            if (slotIndex < menu.slots.size() && menu.slots.get(slotIndex) == slot) {
                 return i;
             }
         }
         return -1;
+    }
+
+    private boolean derk$isPlayerCraftingSlot(int slotIndex) {
+        int mainInventorySize = inventory.items.size();
+        int armorStart = mainInventorySize;
+        int armorEnd = armorStart + inventory.armor.size();
+        return slotIndex < armorStart || slotIndex >= armorEnd;
+    }
+
+    private boolean derk$isUsableForCrafting(ItemStack stack) {
+        return !stack.isDamaged() && !stack.isEnchanted() && !stack.has(DataComponents.CUSTOM_NAME);
     }
 
     private Player derk$resolveInventoryMenuOwner(InventoryMenu inventoryMenu) {

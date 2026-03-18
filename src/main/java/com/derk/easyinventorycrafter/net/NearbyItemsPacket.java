@@ -6,11 +6,11 @@ import java.util.List;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 public record NearbyItemsPacket(List<NearbyItemEntry> entries, List<ItemStack> recipeFinderStacks) implements CustomPacketPayload {
-    public static final Type<NearbyItemsPacket> TYPE = new Type<>(Identifier.fromNamespaceAndPath("derk_easy_inventory_crafter", "nearby_items"));
+    public static final Type<NearbyItemsPacket> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath("derk_easy_inventory_crafter", "nearby_items"));
     public static final StreamCodec<RegistryFriendlyByteBuf, NearbyItemsPacket> STREAM_CODEC = StreamCodec.of((buf, packet) -> packet.write(buf), NearbyItemsPacket::decode);
 
     public static NearbyItemsPacket decode(RegistryFriendlyByteBuf buf) {

@@ -8,8 +8,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
-import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -26,21 +24,15 @@ public final class EasyInventoryCrafterNetwork {
     }
 
     public static void initClient(IEventBus modBus) {
-        modBus.addListener(EasyInventoryCrafterNetwork::registerClientPayloadHandlers);
     }
 
     private static void registerPayloadHandlers(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
         registrar.playToServer(RequestNearbyItemsPacket.TYPE, RequestNearbyItemsPacket.STREAM_CODEC, EasyInventoryCrafterNetwork::handleRequestNearbyItems);
-        registrar.playToClient(NearbyItemsPacket.TYPE, NearbyItemsPacket.STREAM_CODEC);
+        registrar.playToClient(NearbyItemsPacket.TYPE, NearbyItemsPacket.STREAM_CODEC, EasyInventoryCrafterNetwork::handleNearbyItems);
         registrar.playToServer(NearbyHighlightRequestPacket.TYPE, NearbyHighlightRequestPacket.STREAM_CODEC, EasyInventoryCrafterNetwork::handleHighlightRequest);
-        registrar.playToClient(NearbyHighlightResponsePacket.TYPE, NearbyHighlightResponsePacket.STREAM_CODEC);
+        registrar.playToClient(NearbyHighlightResponsePacket.TYPE, NearbyHighlightResponsePacket.STREAM_CODEC, EasyInventoryCrafterNetwork::handleHighlightResponse);
         registrar.playToServer(ReturnNearbyItemsPacket.TYPE, ReturnNearbyItemsPacket.STREAM_CODEC, EasyInventoryCrafterNetwork::handleReturnNearbyItems);
-    }
-
-    private static void registerClientPayloadHandlers(RegisterClientPayloadHandlersEvent event) {
-        event.register(NearbyItemsPacket.TYPE, EasyInventoryCrafterNetwork::handleNearbyItems);
-        event.register(NearbyHighlightResponsePacket.TYPE, EasyInventoryCrafterNetwork::handleHighlightResponse);
     }
 
     public static void sendToPlayer(ServerPlayer player, net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
@@ -48,7 +40,7 @@ public final class EasyInventoryCrafterNetwork {
     }
 
     public static void sendToServer(net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
-        ClientPacketDistributor.sendToServer(packet);
+        PacketDistributor.sendToServer(packet);
     }
 
     private static void handleRequestNearbyItems(RequestNearbyItemsPacket packet, IPayloadContext context) {

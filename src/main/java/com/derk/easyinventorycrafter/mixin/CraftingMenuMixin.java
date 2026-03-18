@@ -9,7 +9,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -51,9 +50,6 @@ public abstract class CraftingMenuMixin implements NearbyCraftingAccess {
     @Shadow
     @Final
     private Player player;
-
-    @Shadow
-    public abstract List<Slot> getInputGridSlots();
 
     @Shadow
     public abstract void slotsChanged(Container container);
@@ -114,7 +110,7 @@ public abstract class CraftingMenuMixin implements NearbyCraftingAccess {
     }
 
     @Inject(method = "finishPlacingRecipe", at = @At("TAIL"))
-    private void derk$refreshAfterFill(ServerLevel level, RecipeHolder<CraftingRecipe> recipe, CallbackInfo ci) {
+    private void derk$refreshAfterFill(RecipeHolder<CraftingRecipe> recipe, CallbackInfo ci) {
         derk$autofillingNearbyWithdrawals = false;
         derk$reconcileNearbyWithdrawals();
         if (player instanceof ServerPlayer serverPlayer) {
@@ -136,7 +132,7 @@ public abstract class CraftingMenuMixin implements NearbyCraftingAccess {
 
         derk$reconcilingNearbyWithdrawals = true;
         try {
-            List<Slot> inputSlots = getInputGridSlots();
+            List<Slot> inputSlots = derk$getInputGridSlots();
             Map<Integer, Integer> cancelableCounts = new HashMap<>();
             for (Integer slotIndex : derk$slotBaselineCounts.keySet()) {
                 if (slotIndex < 0 || slotIndex >= inputSlots.size()) {
@@ -191,7 +187,7 @@ public abstract class CraftingMenuMixin implements NearbyCraftingAccess {
                     break;
                 }
 
-                List<Slot> inputSlots = getInputGridSlots();
+                List<Slot> inputSlots = derk$getInputGridSlots();
                 boolean passChanged = false;
                 for (Iterator<PendingNearbyWithdrawal> iterator = derk$pendingNearbyWithdrawals.iterator(); iterator.hasNext();) {
                     PendingNearbyWithdrawal withdrawal = iterator.next();
@@ -302,7 +298,7 @@ public abstract class CraftingMenuMixin implements NearbyCraftingAccess {
 
     @Unique
     private void derk$refreshAfterNearbyTransfer() {
-        List<Slot> inputSlots = getInputGridSlots();
+        List<Slot> inputSlots = derk$getInputGridSlots();
         if (!inputSlots.isEmpty()) {
             slotsChanged(inputSlots.getFirst().container);
         }
@@ -310,5 +306,20 @@ public abstract class CraftingMenuMixin implements NearbyCraftingAccess {
         if (player instanceof ServerPlayer serverPlayer) {
             NearbyItemsSync.sendNearbyItems(serverPlayer);
         }
+    }
+
+    @Unique
+    private List<Slot> derk$getInputGridSlots() {
+        CraftingMenu menu = (CraftingMenu) (Object) this;
+        int resultSlotIndex = menu.getResultSlotIndex();
+        int gridSize = menu.getGridWidth() * menu.getGridHeight();
+        List<Slot> inputSlots = new ArrayList<>(gridSize);
+        for (int i = 0; i < gridSize; i++) {
+            int slotIndex = resultSlotIndex + 1 + i;
+            if (slotIndex >= 0 && slotIndex < menu.slots.size()) {
+                inputSlots.add(menu.slots.get(slotIndex));
+            }
+        }
+        return inputSlots;
     }
 }

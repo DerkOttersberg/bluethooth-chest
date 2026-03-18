@@ -15,6 +15,7 @@ public final class EasyInventoryCrafterClient {
     public static void onClientSetup(FMLClientSetupEvent event) {
         EasyInventoryCrafterConfig.load();
         NeoForge.EVENT_BUS.addListener(EasyInventoryCrafterClient::onClientTick);
+        NeoForge.EVENT_BUS.addListener(NearbyHighlightRenderer::onRenderLevelStage);
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {

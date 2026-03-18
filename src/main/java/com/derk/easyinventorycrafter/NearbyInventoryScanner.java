@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.ChestType;
+import net.minecraft.core.Direction;
 import org.jetbrains.annotations.Nullable;
 
 public final class NearbyInventoryScanner {
@@ -138,7 +139,7 @@ public final class NearbyInventoryScanner {
             return;
         }
 
-        BlockPos connectedPos = ChestBlock.getConnectedBlockPos(pos, state);
+        BlockPos connectedPos = derk$getConnectedChestPos(pos, state);
         if (!level.isLoaded(connectedPos)) {
             return;
         }
@@ -147,6 +148,11 @@ public final class NearbyInventoryScanner {
         if (connectedState.getBlock() instanceof ChestBlock) {
             positions.add(connectedPos.immutable());
         }
+    }
+
+    private static BlockPos derk$getConnectedChestPos(BlockPos pos, BlockState state) {
+        Direction connectedDirection = ChestBlock.getConnectedDirection(state);
+        return pos.relative(connectedDirection);
     }
 
     @Nullable
